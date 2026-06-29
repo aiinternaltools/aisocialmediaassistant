@@ -1,36 +1,158 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Social Media Assistant
 
-## Getting Started
+Production-ready AI-powered social media management app for a single administrator. Create posts, generate AI content and images, connect social accounts, schedule publications, and publish automatically.
 
-First, run the development server:
+## Tech Stack
+
+- **Next.js 15+** (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- **Supabase** — Auth, PostgreSQL, Storage, Cron (pg_cron + pg_net)
+- **OpenAI** — Text generation (captions, rewrite, hashtags, etc.)
+- **Google Gemini** — Image generation
+- **Meta Graph API** — Facebook & Instagram publishing
+
+## Prerequisites
+
+- Node.js 20+
+- Supabase project ([`zbrltkrcwfktrglkxaha`](https://supabase.com/dashboard/project/zbrltkrcwfktrglkxaha))
+- OpenAI API key
+- Google Gemini API key
+- (Optional) Meta Developer App for live Facebook/Instagram publishing
+
+## Quick Start
 
 ```bash
+cd web
+cp .env.example .env.local
+# Fill in Supabase URL, anon key, service role key, ADMIN_EMAIL, API keys
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+See [`.env.example`](.env.example). Required for local dev:
 
-## Learn More
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role (cron, image upload, publishing) |
+| `ADMIN_EMAIL` | Only this email may sign in |
+| `OPENAI_API_KEY` | OpenAI text generation |
+| `GEMINI_API_KEY` | Gemini image generation |
+| `CRON_SECRET` | Secures `/api/cron/publish` |
+| `TOKEN_ENCRYPTION_KEY` | Encrypts social OAuth tokens at rest |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` in dev |
 
-To learn more about Next.js, take a look at the following resources:
+Meta (optional — dev stub works without):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable | Description |
+|----------|-------------|
+| `FACEBOOK_APP_ID` / `META_APP_ID` | Meta app ID |
+| `FACEBOOK_APP_SECRET` / `META_APP_SECRET` | Meta app secret |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Supabase Setup
 
-## Deploy on Vercel
+### Auth
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Authentication → Providers → Google** — Enable and add Google Cloud OAuth credentials
+2. **Authentication → URL Configuration**
+   - Site URL: `http://localhost:3000`
+   - Redirect URLs: `http://localhost:3000/auth/callback`
+3. Disable public signups (single admin only)
+4. Create admin user manually OR sign in with Google using `ADMIN_EMAIL`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Google Cloud redirect URI:
+
+```
+https://zbrltkrcwfktrglkxaha.supabase.co/auth/v1/callback
+```
+
+### Database
+
+Migrations are applied via Supabase MCP. Schema includes: `profiles`, `settings`, `brand_profiles`, `posts`, `platforms`, `platform_connections`, `scheduled_jobs`, `publication_logs`, `ai_generations`.
+
+### Storage Buckets
+
+`logos`, `images`, `videos`, `generated-images`, `brand-assets` — user-scoped paths: `{bucket}/{userId}/filename`.
+
+### Cron (Scheduled Publishing)
+
+Enable `pg_cron` and `pg_net`, then schedule (replace values):
+
+```sql
+SELECT cron.schedule(
+  'publish-scheduled-posts',
+  '* * * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://YOUR_VERCEL_DOMAIN/api/cron/publish',
+    headers := jsonb_build_object(
+      'Authorization', 'Bearer YOUR_CRON_SECRET',
+      'Content-Type', 'application/json'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Mirror `CRON_SECRET` in Vercel env vars.
+
+## Project Structure
+
+```
+app/                  # Routes (login, dashboard, posts, settings, API)
+components/           # UI + layout + shared
+features/             # Feature modules (auth, brand, posts, integrations…)
+services/             # AI, storage, scheduler, Supabase clients
+lib/                  # Validations, auth helpers, errors
+types/                # Database + app types
+```
+
+## Features
+
+- **Dashboard** — Post stats, recent activity, upcoming schedule
+- **Brand Profile** — Required before AI; drives all prompt generation
+- **Posts** — CRUD, AI text tools, media upload/generation, scheduling
+- **Settings** — Brand, AI prefs, app settings, social connections
+- **Integrations** — Plugin architecture; Facebook & Instagram enabled
+- **Scheduler** — Auto-publish via Supabase Cron → Vercel API route
+
+## Scripts
+
+```bash
+npm run dev      # Development server
+npm run build    # Production build
+npm run start    # Start production server
+npm run lint     # ESLint
+```
+
+## E2E Test Checklist
+
+- [ ] Sign in with Google (`ADMIN_EMAIL` account)
+- [ ] Unauthorized email rejected at `/auth/callback`
+- [ ] Email/password fallback login works
+- [ ] Configure Brand Profile → `is_complete` becomes true
+- [ ] AI text actions blocked until brand complete
+- [ ] Create draft post, edit, duplicate, delete
+- [ ] Upload image / generate AI image on edit page
+- [ ] Connect Facebook/Instagram (Settings → Social Connections)
+- [ ] Schedule post for future → status `scheduled`
+- [ ] Publish Now → status `published` (or `failed` with log)
+- [ ] Cron endpoint rejects without `CRON_SECRET`
+- [ ] Cron endpoint publishes due posts
+- [ ] Dark/light theme toggle works
+
+## Deployment (Vercel)
+
+1. Push repo and import in Vercel (root directory: `web`)
+2. Add all env vars from `.env.example`
+3. Set Supabase redirect URLs to production domain
+4. Configure pg_cron with production URL + `CRON_SECRET`
+
+## License
+
+Private — single-admin internal tool.
