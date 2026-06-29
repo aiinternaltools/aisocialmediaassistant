@@ -165,6 +165,7 @@ export const TIMEZONES = [
   "Europe/London",
   "Europe/Paris",
   "Europe/Berlin",
+  "Europe/Bucharest",
   "Asia/Tokyo",
   "Asia/Shanghai",
   "Australia/Sydney",

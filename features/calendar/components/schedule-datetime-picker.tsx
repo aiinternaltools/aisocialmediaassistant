@@ -14,6 +14,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
+  formatScheduleDisplay,
   QUICK_TIMES,
   SCHEDULE_PRESETS,
   toTimeInputValue,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils"
 interface ScheduleDateTimePickerProps {
   value: string | null | undefined
   onChange: (value: string | null) => void
+  timezone?: string
   id?: string
   disabled?: boolean
   className?: string
@@ -32,6 +34,7 @@ interface ScheduleDateTimePickerProps {
 export function ScheduleDateTimePicker({
   value,
   onChange,
+  timezone = "UTC",
   id,
   disabled = false,
   className,
@@ -48,20 +51,20 @@ export function ScheduleDateTimePicker({
   }, [value])
 
   const [pickerMonth, setPickerMonth] = useState(() => selectedDate)
-  const timeValue = toTimeInputValue(value)
+  const timeValue = toTimeInputValue(value, timezone)
 
   const displayLabel = value
-    ? format(new Date(value), "EEE, MMM d, yyyy · h:mm a")
+    ? formatScheduleDisplay(value, timezone)
     : "Pick date & time"
 
   const isFuture = value ? new Date(value).getTime() > Date.now() : false
 
   function updateSchedule(date: Date, time: string) {
-    onChange(mergeScheduleValue(value, date, time))
+    onChange(mergeScheduleValue(date, time, timezone))
   }
 
-  function applyPreset(getValue: () => Date) {
-    const presetDate = getValue()
+  function applyPreset(getValue: (timezone: string) => Date) {
+    const presetDate = getValue(timezone)
     onChange(presetDate.toISOString())
     setPickerMonth(presetDate)
     setOpen(false)
@@ -114,9 +117,14 @@ export function ScheduleDateTimePicker({
           </div>
 
           <div className="space-y-3 p-3">
+            <p className="text-xs text-muted-foreground">
+              Times are interpreted in{" "}
+              <span className="font-medium text-foreground">{timezone}</span>.
+            </p>
+
             <div className="space-y-1.5">
               <Label htmlFor={`${id ?? "schedule"}-time`} className="text-xs">
-                Time
+                Time ({timezone})
               </Label>
               <Input
                 id={`${id ?? "schedule"}-time`}

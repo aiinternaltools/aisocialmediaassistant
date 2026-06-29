@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { format } from "date-fns"
+import { formatScheduleDisplay } from "@/features/calendar/lib/datetime"
 import { ArrowLeft } from "lucide-react"
 
 import { PageHeader } from "@/components/layout/page-header"
@@ -61,7 +61,7 @@ export default async function EditPostPage({ params }: EditPostPageProps) {
   const postMedia = mediaResult.success ? mediaResult.data : null
 
   const scheduleHint = post.scheduled_at
-    ? `Scheduled for ${format(new Date(post.scheduled_at), "MMM d, yyyy h:mm a")} (${post.timezone})`
+    ? `Scheduled for ${formatScheduleDisplay(post.scheduled_at, post.timezone)} (${post.timezone})`
     : "Not scheduled — saves as draft until you set a future date."
 
   return (

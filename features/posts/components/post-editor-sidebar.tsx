@@ -1,5 +1,4 @@
 import {
-  CalendarClock,
   CheckCircle2,
   Circle,
   FileText,
@@ -197,18 +196,8 @@ export function PostEditorSidebar({
             <div>
               <p className="font-medium">Save changes</p>
               <p className="text-muted-foreground">
-                Updates the post. Status becomes Draft or Scheduled depending on
-                the date field.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2.5">
-            <CalendarClock className="mt-0.5 size-4 shrink-0 text-sky-600 dark:text-sky-400" />
-            <div>
-              <p className="font-medium">Schedule publication</p>
-              <p className="text-muted-foreground">
-                Saves and queues the post for automatic publishing at the
-                scheduled time.
+                Updates the post. With post text, a platform, and a future date,
+                saving schedules automatic publication.
               </p>
             </div>
           </div>
@@ -229,7 +218,7 @@ export function PostEditorSidebar({
           <Info className="size-4" />
           <AlertTitle>Publishing in progress</AlertTitle>
           <AlertDescription>
-            Schedule and publish actions are disabled until this completes.
+            Publish now is disabled until this completes.
           </AlertDescription>
         </Alert>
       ) : null}

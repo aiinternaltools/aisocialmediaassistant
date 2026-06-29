@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { format } from "date-fns"
+import { formatInTimeZone } from "date-fns-tz"
 import {
   Copy,
   FileText,
@@ -202,15 +203,13 @@ export function PostsTable({ data }: PostsTableProps) {
             {data.posts.map((post) => (
               <TableRow
                 key={post.id}
-                className="group transition-colors hover:bg-muted/30"
+                className="group cursor-pointer transition-colors hover:bg-muted/30"
+                onClick={() => router.push(`/posts/${post.id}/edit`)}
               >
                 <TableCell className="max-w-xs">
-                  <Link
-                    href={`/posts/${post.id}/edit`}
-                    className="block truncate font-medium text-foreground transition-colors group-hover:text-primary"
-                  >
+                  <p className="truncate font-medium text-foreground transition-colors group-hover:text-primary">
                     {post.title}
-                  </Link>
+                  </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {post.content || "No content"}
                   </p>
@@ -243,16 +242,23 @@ export function PostsTable({ data }: PostsTableProps) {
                 <TableCell className="text-sm">
                   {post.scheduled_at ? (
                     <span className="text-sky-700 dark:text-sky-400">
-                      {format(new Date(post.scheduled_at), "MMM d, yyyy h:mm a")}
+                      {formatInTimeZone(
+                        post.scheduled_at,
+                        post.timezone,
+                        "MMM d, yyyy h:mm a",
+                      )}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
+                <TableCell
+                  className="text-sm text-muted-foreground"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   {format(new Date(post.updated_at), "MMM d, yyyy")}
                 </TableCell>
-                <TableCell>
+                <TableCell onClick={(event) => event.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={

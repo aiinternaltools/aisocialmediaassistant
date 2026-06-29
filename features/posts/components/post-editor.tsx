@@ -1,6 +1,7 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
+import { formatScheduleDisplay } from "@/features/calendar/lib/datetime"
 import {
   CalendarClock,
   ImageIcon,
@@ -15,6 +16,7 @@ import { useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -40,7 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { createPost, schedulePost, publishNow, updatePost } from "@/features/posts/actions"
+import { createPost, publishNow, updatePost } from "@/features/posts/actions"
 import { AiTextToolbar } from "@/features/posts/components/ai-text-toolbar"
 import { ScheduleDateTimePicker } from "@/features/calendar/components/schedule-datetime-picker"
 import { MediaSection } from "@/features/posts/components/media-section"
@@ -93,6 +95,10 @@ export function PostEditor({
 }: PostEditorProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false)
+  const [pendingValues, setPendingValues] = useState<PostFormValues | null>(
+    null,
+  )
 
   const defaultValues = useMemo<PostFormValues>(
     () => ({
@@ -168,7 +174,7 @@ export function PostEditor({
     form.setValue("content", `${current}${emoji}`, { shouldValidate: true })
   }
 
-  async function onSubmit(values: PostFormValues) {
+  async function submitPost(values: PostFormValues) {
     setIsSubmitting(true)
 
     const result =
@@ -196,7 +202,9 @@ export function PostEditor({
         ? "Post scheduled"
         : mode === "create"
           ? "Post created"
-          : "Post updated",
+          : canSchedulePost(values)
+            ? "Post scheduled"
+            : "Post updated",
     )
 
     if (mode === "create") {
@@ -208,28 +216,25 @@ export function PostEditor({
     router.refresh()
   }
 
-  async function handleSchedule() {
-    if (mode !== "edit" || !postId) {
+  async function handleFormSubmit(values: PostFormValues) {
+    if (isEditMode && canSchedulePost(values)) {
+      setPendingValues(values)
+      setScheduleConfirmOpen(true)
       return
     }
 
-    const valid = await form.trigger()
-    if (!valid) {
+    await submitPost(values)
+  }
+
+  async function confirmScheduleSave() {
+    if (!pendingValues) {
       return
     }
 
-    setIsSubmitting(true)
-    const result = await schedulePost(postId, form.getValues())
-    setIsSubmitting(false)
-
-    if (!result.success) {
-      toast.error(result.error)
-      return
-    }
-
-    toast.success("Post scheduled")
-    router.push("/posts")
-    router.refresh()
+    const values = pendingValues
+    setScheduleConfirmOpen(false)
+    setPendingValues(null)
+    await submitPost(values)
   }
 
   async function handlePublishNow() {
@@ -263,7 +268,8 @@ export function PostEditor({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+    <>
+    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
       {isEditMode && currentStatus ? (
         <Alert
           className={cn(
@@ -284,7 +290,7 @@ export function PostEditor({
           </AlertTitle>
           <AlertDescription>
             {currentStatus === "publishing"
-              ? "Publication is running. Save, schedule, and publish actions are temporarily disabled."
+              ? "Publication is running. Save and publish actions are temporarily disabled."
               : currentStatus === "published"
                 ? "This post is live. Saving updates your draft record only — use Publish now to push changes to platforms."
                 : currentStatus === "failed"
@@ -495,8 +501,8 @@ export function PostEditor({
                 <div>
                   <CardTitle>Schedule</CardTitle>
                   <CardDescription>
-                    Leave empty to keep as draft, or pick a future date to
-                    schedule.
+                    Pick a future date and time in the timezone below. That
+                    timezone controls when the post publishes.
                   </CardDescription>
                 </div>
               </div>
@@ -514,6 +520,7 @@ export function PostEditor({
                   <ScheduleDateTimePicker
                     id="scheduled_at"
                     value={scheduledAt}
+                    timezone={form.watch("timezone")}
                     onChange={(value) =>
                       form.setValue("scheduled_at", value, {
                         shouldValidate: true,
@@ -549,7 +556,12 @@ export function PostEditor({
                     <p className="text-sm text-destructive">
                       {form.formState.errors.timezone.message}
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Example: 4:00 PM with Europe/London publishes at 4:00 PM
+                      UK time (not your computer&apos;s local time).
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -561,7 +573,7 @@ export function PostEditor({
                 <p className="font-medium">Ready to finish?</p>
                 <p className="text-muted-foreground">
                   {isEditMode
-                    ? "Save your work, schedule for later, or publish immediately."
+                    ? "Save your work or publish immediately. A future date and platform will schedule automatically."
                     : willScheduleOnCreate
                       ? "Post text, platform, and a future date are set — saving will schedule and return to Posts."
                       : "Add post text, pick a platform and future date to schedule, or save as draft to continue editing."}
@@ -577,25 +589,14 @@ export function PostEditor({
                   Cancel
                 </Button>
                 {isEditMode ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={!canPublishActions}
-                      onClick={() => void handleSchedule()}
-                    >
-                      <CalendarClock className="size-4" />
-                      Schedule
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={!canPublishActions}
-                      onClick={() => void handlePublishNow()}
-                    >
-                      <Rocket className="size-4" />
-                      Publish now
-                    </Button>
-                  </>
+                  <Button
+                    type="button"
+                    disabled={!canPublishActions}
+                    onClick={() => void handlePublishNow()}
+                  >
+                    <Rocket className="size-4" />
+                    Publish now
+                  </Button>
                 ) : null}
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
@@ -627,5 +628,28 @@ export function PostEditor({
         ) : null}
       </div>
     </form>
+
+    <ConfirmDialog
+      open={scheduleConfirmOpen}
+      onOpenChange={(open) => {
+        setScheduleConfirmOpen(open)
+        if (!open) {
+          setPendingValues(null)
+        }
+      }}
+      title="Schedule this post?"
+      description={
+        pendingValues?.scheduled_at
+          ? `This post will be scheduled for ${formatScheduleDisplay(
+              pendingValues.scheduled_at,
+              pendingValues.timezone,
+            )} (${pendingValues.timezone}) and publish automatically to your selected platforms.`
+          : "This post will be scheduled and publish automatically at the selected time."
+      }
+      confirmLabel="Schedule post"
+      loading={isSubmitting}
+      onConfirm={confirmScheduleSave}
+    />
+    </>
   )
 }
