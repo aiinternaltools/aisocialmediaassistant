@@ -465,6 +465,16 @@ export async function createScheduledJobs(
   )
 }
 
+export async function cancelPendingScheduledJobs(postId: string): Promise<void> {
+  const supabase = createAdminClient()
+
+  await supabase
+    .from("scheduled_jobs")
+    .delete()
+    .eq("post_id", postId)
+    .in("status", ["pending", "failed"])
+}
+
 export async function retryFailedJobs(postId: string): Promise<void> {
   const supabase = createAdminClient()
 

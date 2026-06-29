@@ -10,7 +10,7 @@ const mediaTypeSchema = z.enum([
 
 export const postFormSchema = z
   .object({
-    title: z.string().min(1, "Title is required").max(200, "Title is too long"),
+    title: z.string().max(200, "Title is too long"),
     content: z.string().max(5000, "Content is too long"),
     media_type: mediaTypeSchema,
     scheduled_at: z.string().nullable().optional(),
@@ -21,6 +21,14 @@ export const postFormSchema = z
     brand_profile_id: z.string().uuid().nullable().optional(),
   })
   .superRefine((data, ctx) => {
+    if (!data.title.trim() && !data.content.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Add post text or an internal title",
+        path: ["content"],
+      })
+    }
+
     if (data.scheduled_at) {
       const scheduledDate = new Date(data.scheduled_at)
       if (Number.isNaN(scheduledDate.getTime())) {
@@ -28,6 +36,15 @@ export const postFormSchema = z
           code: "custom",
           message: "Invalid schedule date",
           path: ["scheduled_at"],
+        })
+        return
+      }
+
+      if (scheduledDate.getTime() > Date.now() && !data.content.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Post text is required to schedule",
+          path: ["content"],
         })
       }
     }

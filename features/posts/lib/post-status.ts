@@ -81,6 +81,29 @@ const APP_MANAGED_STATUSES: Enums<"post_status">[] = [
   "failed",
 ]
 
+export function canSchedulePost(values: {
+  content: string
+  platform_ids: string[]
+  scheduled_at?: string | null
+}): boolean {
+  if (!values.scheduled_at?.trim()) {
+    return false
+  }
+
+  if (values.content.trim().length === 0) {
+    return false
+  }
+
+  if (values.platform_ids.length === 0) {
+    return false
+  }
+
+  const scheduledDate = new Date(values.scheduled_at)
+  return (
+    !Number.isNaN(scheduledDate.getTime()) && scheduledDate.getTime() > Date.now()
+  )
+}
+
 /** Draft if no future date; scheduled if future date is set. App-managed statuses are preserved on save. */
 export function resolvePostStatusFromSchedule(
   scheduledAt: string | null | undefined,

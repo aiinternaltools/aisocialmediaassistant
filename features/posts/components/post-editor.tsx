@@ -55,6 +55,7 @@ import {
 } from "@/features/platforms/platform-icons"
 import type { PostMediaWithUrl } from "@/features/posts/media-actions"
 import {
+  canSchedulePost,
   COMMON_EMOJIS,
   formatPostStatus,
   previewSaveStatus,
@@ -116,7 +117,13 @@ export function PostEditor({
   const mediaType = form.watch("media_type")
   const scheduledAt = form.watch("scheduled_at")
 
-  const saveStatusPreview = previewSaveStatus(scheduledAt, currentStatus)
+  const saveStatusPreview = canSchedulePost({
+    content,
+    platform_ids: platformIds,
+    scheduled_at: scheduledAt,
+  })
+    ? "scheduled"
+    : previewSaveStatus(scheduledAt, currentStatus)
   const isAppManagedStatus =
     currentStatus === "published" ||
     currentStatus === "publishing" ||
@@ -128,6 +135,13 @@ export function PostEditor({
   const hasSchedule = Boolean(
     scheduledAt && new Date(scheduledAt).getTime() > Date.now(),
   )
+  const willScheduleOnCreate =
+    mode === "create" &&
+    canSchedulePost({
+      content,
+      platform_ids: platformIds,
+      scheduled_at: scheduledAt,
+    })
   const hasMedia = mediaType !== "none" || Boolean(initialMedia)
   const isEditMode = mode === "edit"
   const canPublishActions =
@@ -169,10 +183,24 @@ export function PostEditor({
       return
     }
 
-    toast.success(mode === "create" ? "Post created" : "Post updated")
+    const scheduledOnCreate =
+      mode === "create" &&
+      canSchedulePost({
+        content: values.content,
+        platform_ids: values.platform_ids,
+        scheduled_at: values.scheduled_at,
+      })
+
+    toast.success(
+      scheduledOnCreate
+        ? "Post scheduled"
+        : mode === "create"
+          ? "Post created"
+          : "Post updated",
+    )
 
     if (mode === "create") {
-      router.push(`/posts/${result.data.id}/edit`)
+      router.push(scheduledOnCreate ? "/posts" : `/posts/${result.data.id}/edit`)
     } else {
       router.push("/posts")
     }
@@ -534,7 +562,9 @@ export function PostEditor({
                 <p className="text-muted-foreground">
                   {isEditMode
                     ? "Save your work, schedule for later, or publish immediately."
-                    : "Create the post first, then schedule or publish from the edit page."}
+                    : willScheduleOnCreate
+                      ? "Post text, platform, and a future date are set — saving will schedule and return to Posts."
+                      : "Add post text, pick a platform and future date to schedule, or save as draft to continue editing."}
                 </p>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
@@ -571,7 +601,11 @@ export function PostEditor({
                   {isSubmitting ? (
                     <Loader2 className="size-4 animate-spin" />
                   ) : null}
-                  {mode === "create" ? "Create post" : "Save changes"}
+                  {mode === "create"
+                    ? willScheduleOnCreate
+                      ? "Schedule post"
+                      : "Save draft"
+                    : "Save changes"}
                 </Button>
               </div>
             </CardContent>

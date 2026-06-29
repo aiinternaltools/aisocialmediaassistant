@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
-import { resolvePostStatusFromSchedule } from "@/features/posts/lib/post-status"
+import { canSchedulePost, resolvePostStatusFromSchedule } from "@/features/posts/lib/post-status"
 import { AppError } from "@/lib/errors/app-error"
 import {
   postFilterSchema,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/validations/post"
 import { createClient } from "@/services/supabase/server"
 import {
+  cancelPendingScheduledJobs,
   createScheduledJobs,
   publishPost,
   retryFailedJobs,
@@ -333,13 +334,19 @@ export async function createPost(
     const userId = await getAuthenticatedUserId()
     const parsed = postFormSchema.parse(values)
     const supabase = await createClient()
-    const status = resolvePostStatusFromSchedule(parsed.scheduled_at)
+    const status = canSchedulePost(parsed)
+      ? "scheduled"
+      : resolvePostStatusFromSchedule(parsed.scheduled_at)
+    const title =
+      parsed.title.trim() ||
+      parsed.content.trim().slice(0, 200) ||
+      "Untitled post"
 
     const { data, error } = await supabase
       .from("posts")
       .insert({
         user_id: userId,
-        title: parsed.title,
+        title,
         content: parsed.content,
         media_type: parsed.media_type,
         status,
@@ -359,6 +366,10 @@ export async function createPost(
     }
 
     await syncPostPlatforms(data.id, parsed.platform_ids)
+
+    if (status === "scheduled" && parsed.scheduled_at) {
+      await createScheduledJobs(data.id, parsed.platform_ids, parsed.scheduled_at)
+    }
 
     revalidatePath("/")
     revalidatePath("/posts")
@@ -402,15 +413,22 @@ export async function updatePost(
       })
     }
 
-    const status = resolvePostStatusFromSchedule(
-      parsed.scheduled_at,
-      existing.status,
-    )
+    const status = canSchedulePost(parsed)
+      ? "scheduled"
+      : resolvePostStatusFromSchedule(
+          parsed.scheduled_at,
+          existing.status,
+        )
+
+    const title =
+      parsed.title.trim() ||
+      parsed.content.trim().slice(0, 200) ||
+      "Untitled post"
 
     const { data, error } = await supabase
       .from("posts")
       .update({
-        title: parsed.title,
+        title,
         content: parsed.content,
         media_type: parsed.media_type,
         status,
@@ -442,6 +460,12 @@ export async function updatePost(
     }
 
     await syncPostPlatforms(postId, parsed.platform_ids)
+
+    if (status === "scheduled" && parsed.scheduled_at) {
+      await createScheduledJobs(postId, parsed.platform_ids, parsed.scheduled_at)
+    } else {
+      await cancelPendingScheduledJobs(postId)
+    }
 
     revalidatePath("/")
     revalidatePath("/posts")
