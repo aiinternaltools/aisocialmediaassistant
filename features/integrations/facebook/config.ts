@@ -26,7 +26,15 @@ export function getMetaAppConfig(): MetaAppConfig | null {
 }
 
 export function isMetaDevStubMode(): boolean {
-  return getMetaAppConfig() === null
+  if (getMetaAppConfig() !== null) {
+    return false
+  }
+
+  if (process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim()) {
+    return false
+  }
+
+  return true
 }
 
 export function getAppBaseUrl(): string {

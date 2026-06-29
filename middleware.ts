@@ -3,7 +3,12 @@ import { type NextRequest, NextResponse } from "next/server"
 import { updateSession } from "@/services/supabase/middleware"
 
 const AUTH_ROUTES = ["/login"]
-const PUBLIC_PREFIXES = ["/_next", "/favicon.ico", "/auth/callback"]
+const PUBLIC_PREFIXES = [
+  "/_next",
+  "/favicon.ico",
+  "/auth/callback",
+  "/api/cron/publish",
+]
 
 function isPublicAsset(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))

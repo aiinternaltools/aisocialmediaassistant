@@ -136,8 +136,7 @@ export function SocialConnections({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Connect your social accounts to publish posts. Without Meta app credentials,
-        Facebook and Instagram run in dev stub mode for local testing.
+        Connect your social accounts to publish posts.
       </p>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -187,13 +186,6 @@ export function SocialConnections({
                     No account connected yet.
                   </p>
                 )}
-
-                {platform.id === "facebook" && facebookEnvTokenAvailable ? (
-                  <p className="text-xs text-muted-foreground">
-                    Access token mode enabled (same as n8n). OAuth Connect is
-                    optional.
-                  </p>
-                ) : null}
 
                 {platform.connection?.token_expires_at ? (
                   <p>
