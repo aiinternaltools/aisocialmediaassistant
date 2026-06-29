@@ -30,9 +30,35 @@ export function isMetaDevStubMode(): boolean {
 }
 
 export function getAppBaseUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? ""
+  const vercelHost = process.env.VERCEL_URL?.trim().replace(/^https?:\/\//, "")
+
+  if (vercelHost) {
+    const vercelBase = `https://${vercelHost}`
+    if (
+      !explicit ||
+      explicit.includes("localhost") ||
+      explicit.includes("127.0.0.1")
+    ) {
+      return vercelBase
+    }
+    return explicit
+  }
+
+  return explicit || "http://localhost:3000"
+}
+
+/** True when NEXT_PUBLIC_APP_URL points at localhost but the app runs on Vercel. */
+export function isAppUrlMisconfiguredForVercel(): boolean {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? ""
+  const vercelHost = process.env.VERCEL_URL?.trim()
+  if (!vercelHost) {
+    return false
+  }
   return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000"
+    !explicit ||
+    explicit.includes("localhost") ||
+    explicit.includes("127.0.0.1")
   )
 }
 

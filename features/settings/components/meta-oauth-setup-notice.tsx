@@ -21,6 +21,8 @@ interface MetaOAuthSetupNoticeProps {
   instagramRedirectUri: string
   configId: string | null
   configurationsUrl: string
+  basicSettingsUrl: string
+  appUrlMisconfigured?: boolean
 }
 
 function CopyValue({ label, value }: { label: string; value: string }) {
@@ -49,22 +51,35 @@ export function MetaOAuthSetupNotice({
   instagramRedirectUri,
   configId,
   configurationsUrl,
+  basicSettingsUrl,
+  appUrlMisconfigured = false,
 }: MetaOAuthSetupNoticeProps) {
-  const metaAppUrl = `https://developers.facebook.com/apps/${appId}/settings/basic/`
   const usesHttps = appBaseUrl.startsWith("https://")
 
   return (
     <Card className="border-amber-500/25 bg-amber-500/[0.04]">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Meta OAuth setup (Facebook Login for Business)</CardTitle>
+        <CardTitle className="text-base">Facebook connection setup</CardTitle>
         <CardDescription>
-          Business apps register redirect URIs under{" "}
-          <strong className="text-foreground">Configurations</strong>, not Settings.
-          Enforce HTTPS is locked — use an{" "}
-          <strong className="text-foreground">https://</strong> app URL (ngrok or Vercel).
+          Fix the &quot;domain not included&quot; error by matching Meta{" "}
+          <strong className="text-foreground">App Domains</strong> and{" "}
+          <strong className="text-foreground">Configuration redirect URI</strong>{" "}
+          to the values below exactly.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {appUrlMisconfigured ? (
+          <Alert variant="destructive">
+            <AlertTitle className="text-sm">Vercel URL misconfiguration</AlertTitle>
+            <AlertDescription className="text-sm">
+              Set{" "}
+              <code className="text-xs">NEXT_PUBLIC_APP_URL=https://aisocialmediaassistant.vercel.app</code>{" "}
+              in Vercel env vars and redeploy. The app auto-detects Vercel, but
+              Meta must still list the same domain.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
         {!usesHttps ? (
           <Alert variant="destructive">
             <AlertTitle className="text-sm">HTTPS required</AlertTitle>
@@ -78,10 +93,65 @@ export function MetaOAuthSetupNotice({
           </Alert>
         ) : null}
 
+        <Alert variant="destructive">
+          <AlertTitle className="text-sm">
+            Error: &quot;Domeniul acestui URL nu este inclus...&quot;
+          </AlertTitle>
+          <AlertDescription className="space-y-2 text-sm">
+            <p>Meta blocks the redirect because these three values do not match:</p>
+            <ol className="list-decimal space-y-1 pl-4">
+              <li>
+                <a
+                  href={basicSettingsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Basic settings → App Domains
+                </a>
+                : must be exactly{" "}
+                <code className="text-xs">{appDomain}</code> (no https://)
+              </li>
+              <li>
+                <a
+                  href={configurationsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Configurations → Redirect URI
+                </a>
+                : must be exactly{" "}
+                <code className="text-xs">{facebookRedirectUri}</code>
+              </li>
+              <li>
+                Vercel <code className="text-xs">NEXT_PUBLIC_APP_URL</code> and{" "}
+                <code className="text-xs">META_FB_LOGIN_CONFIG_ID</code> set, then
+                redeploy
+              </li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+
         <Alert>
-          <AlertTitle className="text-sm">Create a Configuration in Meta</AlertTitle>
+          <AlertTitle className="text-sm">Meta setup steps (Facebook only)</AlertTitle>
           <AlertDescription className="space-y-2 text-sm">
             <ol className="list-decimal space-y-1.5 pl-4">
+              <li>
+                Open{" "}
+                <a
+                  href={basicSettingsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  App settings → Basic
+                  <ExternalLink className="size-3" />
+                </a>{" "}
+                — set <strong>App Domains</strong> to{" "}
+                <code className="text-xs">{appDomain}</code> (remove{" "}
+                <code className="text-xs">localhost</code> if still there)
+              </li>
               <li>
                 Open{" "}
                 <a
@@ -90,46 +160,17 @@ export function MetaOAuthSetupNotice({
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
                 >
-                  Facebook Login for Business → Configurations
+                  Configurations
                   <ExternalLink className="size-3" />
-                </a>
-              </li>
-              <li>
-                Click <strong>Create configuration</strong> (or use template
-                &quot;Instagram API&quot; if posting to IG)
-              </li>
-              <li>
-                Token type: <strong>User access token</strong>
-              </li>
-              <li>
-                Permissions: at least{" "}
-                <code className="text-xs">pages_show_list</code>,{" "}
-                <code className="text-xs">pages_read_engagement</code>,{" "}
-                <code className="text-xs">pages_manage_posts</code>
-                {", plus Instagram permissions if needed"}
-              </li>
-              <li>
-                Redirect URI: paste{" "}
-                <code className="text-xs">{facebookRedirectUri}</code> (same URI
-                works for Instagram connect)
-              </li>
-              <li>
-                Copy the <strong>Configuration ID</strong> into{" "}
-                <code className="text-xs">META_FB_LOGIN_CONFIG_ID</code> in{" "}
-                <code className="text-xs">.env</code> and restart the server
-              </li>
-              <li>
-                Set <strong>App Domains</strong> in{" "}
-                <a
-                  href={metaAppUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Basic settings
                 </a>{" "}
-                to <code className="text-xs">{appDomain}</code>
+                — create config: User token, Page permissions, redirect URI above
               </li>
+              <li>
+                Copy <strong>Configuration ID</strong> → Vercel env{" "}
+                <code className="text-xs">META_FB_LOGIN_CONFIG_ID</code>
+              </li>
+              <li>App mode: <strong>Development</strong>, you as Admin</li>
+              <li>Save Meta, redeploy Vercel, wait 1 minute, try Connect</li>
             </ol>
           </AlertDescription>
         </Alert>

@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/card"
 import { EmptyState } from "@/components/shared/empty-state"
 import {
+  connectFacebookWithEnvToken,
   connectPlatform,
   disconnectPlatform,
   refreshConnection,
@@ -30,6 +31,7 @@ import { cn } from "@/lib/utils"
 
 interface SocialConnectionsProps {
   platforms: PlatformWithConnection[]
+  facebookEnvTokenAvailable?: boolean
 }
 
 function getConnectionLabel(
@@ -55,9 +57,27 @@ function isConnected(connection: PlatformWithConnection["connection"]): boolean 
   return connection?.status === "connected"
 }
 
-export function SocialConnections({ platforms }: SocialConnectionsProps) {
+export function SocialConnections({
+  platforms,
+  facebookEnvTokenAvailable = false,
+}: SocialConnectionsProps) {
   const router = useRouter()
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
+
+  async function handleConnectWithEnvToken() {
+    setLoadingPlatform("facebook")
+
+    const result = await connectFacebookWithEnvToken()
+    setLoadingPlatform(null)
+
+    if (!result.success) {
+      toast.error(result.error)
+      return
+    }
+
+    toast.success("Facebook Page connected via access token")
+    router.refresh()
+  }
 
   async function handleConnect(platformId: string) {
     setLoadingPlatform(platformId)
@@ -168,6 +188,13 @@ export function SocialConnections({ platforms }: SocialConnectionsProps) {
                   </p>
                 )}
 
+                {platform.id === "facebook" && facebookEnvTokenAvailable ? (
+                  <p className="text-xs text-muted-foreground">
+                    Access token mode enabled (same as n8n). OAuth Connect is
+                    optional.
+                  </p>
+                ) : null}
+
                 {platform.connection?.token_expires_at ? (
                   <p>
                     <span className="text-muted-foreground">Token expires: </span>
@@ -179,15 +206,27 @@ export function SocialConnections({ platforms }: SocialConnectionsProps) {
               </CardContent>
 
               <CardFooter className="flex flex-wrap gap-2">
-                <Button
-                  disabled={isLoading || isLinkedIn}
-                  onClick={() => handleConnect(platform.id)}
-                >
-                  {isLoading && !connected ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : null}
-                  {connected ? "Reconnect" : "Connect"}
-                </Button>
+                {platform.id === "facebook" && facebookEnvTokenAvailable ? (
+                  <Button
+                    disabled={isLoading || isLinkedIn}
+                    onClick={() => void handleConnectWithEnvToken()}
+                  >
+                    {isLoading && !connected ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : null}
+                    {connected ? "Reconnect token" : "Connect with access token"}
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={isLoading || isLinkedIn}
+                    onClick={() => handleConnect(platform.id)}
+                  >
+                    {isLoading && !connected ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : null}
+                    {connected ? "Reconnect" : "Connect"}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   disabled={isLoading || !connected}

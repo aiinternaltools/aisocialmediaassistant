@@ -19,6 +19,7 @@ import { AiSettingsForm } from "@/features/settings/components/ai-settings-form"
 import { AppSettingsForm } from "@/features/settings/components/app-settings-form"
 import { SocialConnections } from "@/features/settings/components/social-connections"
 import { MetaOAuthSetupPanel } from "@/features/settings/components/meta-oauth-setup-panel"
+import { hasEnvFacebookPageToken } from "@/features/integrations/facebook/env-token"
 import {
   mapSettingsToAiForm,
   mapSettingsToAppForm,
@@ -166,7 +167,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 
         <TabsContent value="social" className="mt-6 space-y-4">
           <MetaOAuthSetupPanel />
-          <SocialConnections platforms={platformConnections} />
+          <SocialConnections
+            platforms={platformConnections}
+            facebookEnvTokenAvailable={hasEnvFacebookPageToken()}
+          />
         </TabsContent>
 
         <TabsContent value="app" className="mt-6">

@@ -3,6 +3,7 @@ import {
   getMetaAppConfig,
   getMetaLoginConfigId,
   getOAuthRedirectUri,
+  isAppUrlMisconfiguredForVercel,
 } from "@/features/integrations/facebook/config"
 import { MetaOAuthSetupNotice } from "@/features/settings/components/meta-oauth-setup-notice"
 
@@ -23,6 +24,7 @@ export function MetaOAuthSetupPanel() {
 
   const configId = getMetaLoginConfigId()
   const configurationsUrl = `https://developers.facebook.com/apps/${config.appId}/business-login/configurations/`
+  const basicSettingsUrl = `https://developers.facebook.com/apps/${config.appId}/settings/basic/`
 
   return (
     <MetaOAuthSetupNotice
@@ -33,6 +35,8 @@ export function MetaOAuthSetupPanel() {
       instagramRedirectUri={getOAuthRedirectUri("instagram")}
       configId={configId}
       configurationsUrl={configurationsUrl}
+      basicSettingsUrl={basicSettingsUrl}
+      appUrlMisconfigured={isAppUrlMisconfiguredForVercel()}
     />
   )
 }

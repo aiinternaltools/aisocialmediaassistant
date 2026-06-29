@@ -5,6 +5,10 @@ import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 
 import { getOAuthRedirectUri } from "@/features/integrations/facebook/config"
+import {
+  buildFacebookTokensFromEnv,
+  hasEnvFacebookPageToken,
+} from "@/features/integrations/facebook/env-token"
 import "@/features/integrations/registry"
 import {
   getAllConnectors,
@@ -69,6 +73,15 @@ export async function connectPlatform(
       throw IntegrationError.platformNotSupported(platformId)
     }
 
+    if (platformId === "facebook" && hasEnvFacebookPageToken()) {
+      throw new AppError({
+        code: "VALIDATION",
+        message: "Use connectFacebookWithEnvToken for env token flow",
+        userMessage:
+          "Facebook is configured with an access token. Use “Connect with access token” instead.",
+      })
+    }
+
     const connector = getConnector(platformId)
     const state = randomBytes(24).toString("hex")
     await setOAuthState(platformId, state)
@@ -77,6 +90,30 @@ export async function connectPlatform(
     const authUrl = connector.getAuthUrl(state, redirectUri)
 
     return { success: true, data: { authUrl } }
+  } catch (error) {
+    return toActionError(error)
+  }
+}
+
+/** Connect Facebook using FACEBOOK_PAGE_ACCESS_TOKEN (same approach as n8n). */
+export async function connectFacebookWithEnvToken(): Promise<ActionResult> {
+  try {
+    const user = await requireAuth()
+
+    if (!hasEnvFacebookPageToken()) {
+      throw new AppError({
+        code: "VALIDATION",
+        message: "FACEBOOK_PAGE_ACCESS_TOKEN missing",
+        userMessage:
+          "Add FACEBOOK_PAGE_ACCESS_TOKEN to your server environment (Vercel), then redeploy.",
+      })
+    }
+
+    const tokens = await buildFacebookTokensFromEnv()
+    await upsertPlatformConnectionFromOAuth(user.id, "facebook", tokens)
+
+    revalidatePath(SETTINGS_PATH)
+    return { success: true, data: undefined }
   } catch (error) {
     return toActionError(error)
   }
