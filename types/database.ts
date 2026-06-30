@@ -165,6 +165,54 @@ export type Database = {
         };
         Relationships: [];
       };
+      marketing_campaigns: {
+        Row: {
+          campaign_goal: string;
+          created_at: string;
+          duration_days: number;
+          extra_instructions: string | null;
+          id: string;
+          is_active: boolean;
+          name: string;
+          product_ids: string[];
+          seasonality: string | null;
+          strategy: Json;
+          target_audience: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          campaign_goal: string;
+          created_at?: string;
+          duration_days: number;
+          extra_instructions?: string | null;
+          id?: string;
+          is_active?: boolean;
+          name: string;
+          product_ids?: string[];
+          seasonality?: string | null;
+          strategy?: Json;
+          target_audience?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          campaign_goal?: string;
+          created_at?: string;
+          duration_days?: number;
+          extra_instructions?: string | null;
+          id?: string;
+          is_active?: boolean;
+          name?: string;
+          product_ids?: string[];
+          seasonality?: string | null;
+          strategy?: Json;
+          target_audience?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       platform_connections: {
         Row: {
           access_token_encrypted: string | null;
@@ -336,6 +384,45 @@ export type Database = {
           title?: string;
           updated_at?: string;
           user_id?: string;
+        };
+        Relationships: [];
+      };
+      products: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: "product" | "service";
+          name: string;
+          description: string | null;
+          source_url: string | null;
+          image_storage_path: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: "product" | "service";
+          name: string;
+          description?: string | null;
+          source_url?: string | null;
+          image_storage_path?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: "product" | "service";
+          name?: string;
+          description?: string | null;
+          source_url?: string | null;
+          image_storage_path?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };

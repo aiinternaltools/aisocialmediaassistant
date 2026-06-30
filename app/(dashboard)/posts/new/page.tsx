@@ -1,15 +1,13 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 
-import { PageHeader } from "@/components/layout/page-header"
-import { getBrandProfile } from "@/features/brand/actions"
-import { getPlatforms } from "@/features/posts/actions"
-import { PostEditor } from "@/features/posts/components/post-editor"
 import { createClient } from "@/services/supabase/server"
 
 export const metadata: Metadata = {
   title: "New Post",
 }
+
+export const dynamic = "force-dynamic"
 
 export default async function NewPostPage() {
   const supabase = await createClient()
@@ -21,35 +19,37 @@ export default async function NewPostPage() {
     redirect("/login")
   }
 
-  const [platformsResult, brandResult] = await Promise.all([
-    getPlatforms(),
-    getBrandProfile(),
+  const [{ data: settings }, { data: brandProfile }] = await Promise.all([
+    supabase
+      .from("settings")
+      .select("timezone")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("brand_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ])
 
-  const platforms = platformsResult.success ? platformsResult.data : []
-  const brandProfile = brandResult.success ? brandResult.data : null
+  const { data, error } = await supabase
+    .from("posts")
+    .insert({
+      user_id: user.id,
+      title: "Untitled post",
+      content: "",
+      media_type: "none",
+      status: "draft",
+      scheduled_at: null,
+      timezone: settings?.timezone ?? "UTC",
+      brand_profile_id: brandProfile?.id ?? null,
+    })
+    .select("id")
+    .single()
 
-  const { data: settings } = await supabase
-    .from("settings")
-    .select("timezone")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to create draft post.")
+  }
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="New Post"
-        description="Compose a new social media post."
-      />
-      <PostEditor
-        mode="create"
-        platforms={platforms}
-        defaultTimezone={settings?.timezone ?? "UTC"}
-        brandProfileComplete={brandProfile?.is_complete ?? false}
-        initialValues={{
-          brand_profile_id: brandProfile?.id ?? null,
-        }}
-      />
-    </div>
-  )
+  redirect(`/posts/${data.id}/edit`)
 }

@@ -2,14 +2,12 @@
 
 import {
   Hash,
-  Languages,
   Loader2,
   MessageSquarePlus,
   Minimize2,
   Maximize2,
   Pencil,
   Sparkles,
-  Type,
   Wand2,
 } from "lucide-react"
 import Link from "next/link"
@@ -27,16 +25,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  aiChangeTone,
   aiCustomInstruction,
   aiExpand,
   aiGenerateCaption,
@@ -45,42 +35,10 @@ import {
   aiImproveWriting,
   aiRewrite,
   aiShorten,
-  aiSummarize,
-  aiTranslate,
+  type ProductContext,
 } from "@/features/posts/ai-actions"
 
-const TRANSLATE_LANGUAGES = [
-  "English",
-  "Spanish",
-  "French",
-  "German",
-  "Italian",
-  "Portuguese",
-  "Dutch",
-  "Japanese",
-  "Korean",
-  "Chinese (Simplified)",
-  "Arabic",
-  "Hindi",
-] as const
-
-const TONE_OPTIONS = [
-  "Professional",
-  "Friendly",
-  "Luxury",
-  "Funny",
-  "Educational",
-  "Inspirational",
-  "Conversational",
-  "Persuasive",
-  "Minimal",
-] as const
-
-type DialogMode =
-  | "custom"
-  | "translate"
-  | "tone"
-  | null
+type DialogMode = "custom" | null
 
 type AiOperationKey =
   | "generate_caption"
@@ -88,7 +46,6 @@ type AiOperationKey =
   | "improve_writing"
   | "generate_cta"
   | "generate_hashtags"
-  | "summarize"
   | "expand"
   | "shorten"
 
@@ -99,6 +56,8 @@ interface AiTextToolbarProps {
   brandProfileComplete: boolean
   onContentChange: (value: string) => void
   disabled?: boolean
+  productContext?: ProductContext | null
+  strategyStep?: import("@/services/ai/types").StrategyStepPromptContext | null
 }
 
 export function AiTextToolbar({
@@ -108,14 +67,12 @@ export function AiTextToolbar({
   brandProfileComplete,
   onContentChange,
   disabled = false,
+  productContext,
+  strategyStep,
 }: AiTextToolbarProps) {
   const [loadingKey, setLoadingKey] = useState<string | null>(null)
   const [dialogMode, setDialogMode] = useState<DialogMode>(null)
   const [dialogInstruction, setDialogInstruction] = useState("")
-  const [targetLanguage, setTargetLanguage] = useState<string>(
-    TRANSLATE_LANGUAGES[0],
-  )
-  const [tone, setTone] = useState<string>(TONE_OPTIONS[0])
 
   const isBusy = loadingKey !== null
   const aiDisabled = disabled || isBusy
@@ -155,86 +112,42 @@ export function AiTextToolbar({
       postContent: content,
       platformIds,
       postId: postId ?? null,
+      productContext: productContext ?? null,
+      strategyStep: strategyStep ?? null,
       ...extra,
     }
   }
 
   async function handleDialogSubmit() {
-    if (dialogMode === "custom") {
-      if (!dialogInstruction.trim()) {
-        toast.error("Enter an instruction for the AI.")
-        return
-      }
-
-      setLoadingKey("custom")
-      const result = await aiCustomInstruction(
-        baseInput({ userInstruction: dialogInstruction.trim() }),
-      )
-      setLoadingKey(null)
-      setDialogMode(null)
-      setDialogInstruction("")
-
-      if (!result.success) {
-        toast.error(result.error ?? "AI generation failed.")
-        return
-      }
-
-      if (!result.data) {
-        toast.error("AI generation failed.")
-        return
-      }
-
-      onContentChange(result.data.text)
-      toast.success("AI content applied.")
+    if (dialogMode !== "custom") {
       return
     }
 
-    if (dialogMode === "translate") {
-      setLoadingKey("translate")
-      const result = await aiTranslate({
-        ...baseInput(),
-        targetLanguage,
-      })
-      setLoadingKey(null)
-      setDialogMode(null)
-
-      if (!result.success) {
-        toast.error(result.error ?? "Translation failed.")
-        return
-      }
-
-      if (!result.data) {
-        toast.error("Translation failed.")
-        return
-      }
-
-      onContentChange(result.data.text)
-      toast.success("Translation applied.")
+    if (!dialogInstruction.trim()) {
+      toast.error("Enter an instruction for the AI.")
       return
     }
 
-    if (dialogMode === "tone") {
-      setLoadingKey("change_tone")
-      const result = await aiChangeTone({
-        ...baseInput(),
-        tone,
-      })
-      setLoadingKey(null)
-      setDialogMode(null)
+    setLoadingKey("custom")
+    const result = await aiCustomInstruction(
+      baseInput({ userInstruction: dialogInstruction.trim() }),
+    )
+    setLoadingKey(null)
+    setDialogMode(null)
+    setDialogInstruction("")
 
-      if (!result.success) {
-        toast.error(result.error ?? "Tone change failed.")
-        return
-      }
-
-      if (!result.data) {
-        toast.error("Tone change failed.")
-        return
-      }
-
-      onContentChange(result.data.text)
-      toast.success("Tone updated.")
+    if (!result.success) {
+      toast.error(result.error ?? "AI generation failed.")
+      return
     }
+
+    if (!result.data) {
+      toast.error("AI generation failed.")
+      return
+    }
+
+    onContentChange(result.data.text)
+    toast.success("AI content applied.")
   }
 
   return (
@@ -356,45 +269,6 @@ export function AiTextToolbar({
           variant="outline"
           size="sm"
           disabled={aiDisabled || !content.trim()}
-          onClick={() => setDialogMode("translate")}
-        >
-          <Languages className="size-3.5" />
-          Translate
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={aiDisabled || !content.trim()}
-          onClick={() => setDialogMode("tone")}
-        >
-          <Type className="size-3.5" />
-          Tone
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={aiDisabled || !content.trim()}
-          onClick={() =>
-            runDirectOperation("summarize", () => aiSummarize(baseInput()))
-          }
-        >
-          {loadingKey === "summarize" ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Minimize2 className="size-3.5" />
-          )}
-          Summarize
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={aiDisabled || !content.trim()}
           onClick={() =>
             runDirectOperation("expand", () => aiExpand(baseInput()))
           }
@@ -450,83 +324,22 @@ export function AiTextToolbar({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {dialogMode === "custom" && "Custom AI instruction"}
-              {dialogMode === "translate" && "Translate post"}
-              {dialogMode === "tone" && "Change tone"}
-            </DialogTitle>
+            <DialogTitle>Custom AI instruction</DialogTitle>
             <DialogDescription>
-              {dialogMode === "custom" &&
-                "Describe how the AI should transform or generate content."}
-              {dialogMode === "translate" &&
-                "Choose the language to translate your post into."}
-              {dialogMode === "tone" &&
-                "Choose the tone for rewriting your post."}
+              Describe how the AI should transform or generate content.
             </DialogDescription>
           </DialogHeader>
 
-          {dialogMode === "custom" ? (
-            <div className="space-y-2">
-              <Label htmlFor="ai-instruction">Instruction</Label>
-              <Textarea
-                id="ai-instruction"
-                rows={4}
-                value={dialogInstruction}
-                onChange={(event) => setDialogInstruction(event.target.value)}
-                placeholder="e.g. Make it more playful and add a question at the end"
-              />
-            </div>
-          ) : null}
-
-          {dialogMode === "translate" ? (
-            <div className="space-y-2">
-              <Label>Target language</Label>
-              <Select
-                value={targetLanguage}
-                onValueChange={(value) => {
-                  if (value) {
-                    setTargetLanguage(value)
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRANSLATE_LANGUAGES.map((language) => (
-                    <SelectItem key={language} value={language}>
-                      {language}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-
-          {dialogMode === "tone" ? (
-            <div className="space-y-2">
-              <Label>Tone</Label>
-              <Select
-                value={tone}
-                onValueChange={(value) => {
-                  if (value) {
-                    setTone(value)
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TONE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
+          <div className="space-y-2">
+            <Label htmlFor="ai-instruction">Instruction</Label>
+            <Textarea
+              id="ai-instruction"
+              rows={4}
+              value={dialogInstruction}
+              onChange={(event) => setDialogInstruction(event.target.value)}
+              placeholder="e.g. Make it more playful and add a question at the end"
+            />
+          </div>
 
           <DialogFooter>
             <Button

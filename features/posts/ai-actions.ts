@@ -18,8 +18,14 @@ import {
   resolveTextProvider,
 } from "@/services/ai/text"
 import type { AiTextOperation } from "@/services/ai/types"
+import type { StrategyStepPromptContext } from "@/services/ai/types"
 import { createClient } from "@/services/supabase/server"
 import type { ActionResult, BrandProfileRow, SettingsBundle } from "@/types/app"
+
+export type ProductContext = {
+  name: string
+  description?: string | null
+}
 
 export type AiTextActionInput = {
   postContent: string
@@ -28,6 +34,8 @@ export type AiTextActionInput = {
   postId?: string | null
   targetLanguage?: string
   tone?: string
+  productContext?: ProductContext | null
+  strategyStep?: StrategyStepPromptContext | null
 }
 
 type AiTextActionResult = { text: string }
@@ -139,6 +147,8 @@ async function runAiTextAction(
     userInstruction?: string
     targetLanguage?: string
     tone?: string
+    productContext?: ProductContext | null
+    strategyStep?: StrategyStepPromptContext | null
   }) => Promise<{ text: string; tokensUsed: number | null; promptSummary: string }>,
 ): Promise<ActionResult<AiTextActionResult>> {
   try {
@@ -158,6 +168,8 @@ async function runAiTextAction(
       userInstruction: input.userInstruction,
       targetLanguage: input.targetLanguage,
       tone: input.tone,
+      productContext: input.productContext,
+      strategyStep: input.strategyStep,
     })
 
     await logAiGeneration({

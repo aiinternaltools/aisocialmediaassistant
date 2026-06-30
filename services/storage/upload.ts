@@ -3,6 +3,7 @@ import {
   BUCKET_CONFIG,
   type StorageBucket,
 } from "@/services/storage/constants"
+import { createAdminClient } from "@/services/supabase/admin"
 import { createClient } from "@/services/supabase/server"
 
 export type { StorageBucket, BucketConfig } from "@/services/storage/constants"
@@ -98,6 +99,25 @@ export async function createSignedUrl(
     .createSignedUrl(storagePath, expiresInSeconds)
 
   if (error || !data?.signedUrl) {
+    return null
+  }
+
+  return data.signedUrl
+}
+
+/** Uses the service-role client to sign a URL — bypasses RLS, safe for server-only use. */
+export async function createAdminSignedUrl(
+  bucket: StorageBucket | "logos" | "brand-assets",
+  storagePath: string,
+  expiresInSeconds = 60 * 60,
+): Promise<string | null> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(storagePath, expiresInSeconds)
+
+  if (error || !data?.signedUrl) {
+    console.error("[storage] createAdminSignedUrl failed:", error?.message, "path:", storagePath)
     return null
   }
 

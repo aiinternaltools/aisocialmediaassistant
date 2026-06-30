@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { AppError } from "@/lib/errors/app-error"
-import {
-  assertBrandProfileComplete,
-  logAiGeneration,
-} from "@/services/ai/guards"
+import { logAiGeneration } from "@/services/ai/guards"
 import { generateImage } from "@/services/ai/gemini"
 import type { ImageAspectRatio } from "@/services/ai/types"
 import {
@@ -41,7 +38,9 @@ async function getAuthenticatedUserId(): Promise<string> {
   return user.id
 }
 
-async function loadBrandProfile(userId: string): Promise<BrandProfileRow> {
+async function loadBrandProfile(
+  userId: string,
+): Promise<BrandProfileRow | null> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("brand_profiles")
@@ -59,7 +58,6 @@ async function loadBrandProfile(userId: string): Promise<BrandProfileRow> {
     })
   }
 
-  assertBrandProfileComplete(data)
   return data
 }
 
@@ -367,6 +365,8 @@ export async function generatePostImage(input: {
   prompt?: string
   postContent?: string
   aspectRatio: ImageAspectRatio
+  productContext?: { name: string; description?: string | null } | null
+  productImageStoragePath?: string | null
 }): Promise<ActionResult<PostMediaWithUrl>> {
   try {
     const userId = await getAuthenticatedUserId()
@@ -390,6 +390,27 @@ export async function generatePostImage(input: {
       })
     }
 
+    let productImageBytes: { data: Buffer; mimeType: string } | null = null
+
+    if (input.productImageStoragePath) {
+      try {
+        const supabase = await createClient()
+        const { data, error } = await supabase.storage
+          .from("product-images")
+          .download(input.productImageStoragePath)
+
+        if (!error && data) {
+          const arrayBuffer = await data.arrayBuffer()
+          productImageBytes = {
+            data: Buffer.from(arrayBuffer),
+            mimeType: data.type || "image/jpeg",
+          }
+        }
+      } catch {
+        // Best-effort — continue without product image if download fails
+      }
+    }
+
     await removeExistingPostMedia(input.postId)
 
     const generated = await generateImage({
@@ -399,6 +420,8 @@ export async function generatePostImage(input: {
       brandProfile,
       settings,
       userId,
+      productContext: input.productContext,
+      productImageBytes,
     })
 
     const supabase = await createClient()
@@ -434,7 +457,7 @@ export async function generatePostImage(input: {
     await logAiGeneration({
       operation: "generate_image",
       provider: "gemini",
-      brandProfileId: brandProfile.id,
+      brandProfileId: brandProfile?.id ?? null,
       postId: input.postId,
       promptSummary: `Image: ${input.aspectRatio}`,
       metadata: {

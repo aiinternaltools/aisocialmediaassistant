@@ -2,6 +2,9 @@ import type { BrandProfileRow, ProductServiceItem } from "@/types/app"
 
 import { resolveDefaultImagePrompt, resolveDefaultTextPrompt, resolveDefaultTextLengthPrompt } from "./default-prompts"
 import type { AiTextOperation, BuildPromptInput } from "./types"
+import { formatStrategyContentType } from "./strategy-prompt-builder"
+
+export type { ProductContext } from "./types"
 
 const OPERATION_INSTRUCTIONS: Record<AiTextOperation, string> = {
   generate_caption:
@@ -111,6 +114,41 @@ export function buildPrompt(input: BuildPromptInput): {
     ...(hasBrand && brandProfile
       ? ["## Brand Profile", buildBrandContext(brandProfile), ""]
       : []),
+    ...(input.productContext
+      ? [
+          "## Featured Product / Service",
+          [
+            `Name: ${input.productContext.name}`,
+            input.productContext.description
+              ? `Description: ${input.productContext.description}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          "",
+        ]
+      : []),
+    ...(input.strategyStep
+      ? [
+          "## Marketing Strategy Step",
+          [
+            `Day: ${input.strategyStep.day} of ${input.strategyStep.totalDays}`,
+            `Content type: ${formatStrategyContentType(input.strategyStep.content_type)}`,
+            `Topic: ${input.strategyStep.topic}`,
+            `Objective: ${input.strategyStep.objective}`,
+            input.strategyStep.notes
+              ? `Notes: ${input.strategyStep.notes}`
+              : null,
+            input.strategyStep.product_reference
+              ? `Featured product: ${input.strategyStep.product_reference}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          "Follow this strategy step as the primary creative direction for the caption.",
+          "",
+        ]
+      : []),
     "## Target Platforms",
     platforms,
     "",
@@ -135,24 +173,55 @@ export function buildPrompt(input: BuildPromptInput): {
 export function buildImagePrompt(input: {
   prompt: string
   postContent: string
-  brandProfile: BrandProfileRow
+  brandProfile: BrandProfileRow | null
   settingsStyle: string
   defaultImagePrompt?: string | null
+  productContext?: { name: string; description?: string | null } | null
+  hasProductImage?: boolean
 }): string {
   const { brandProfile, prompt, settingsStyle, postContent } = input
   const basePrompt = resolveDefaultImagePrompt(input.defaultImagePrompt)
   const caption = postContent.trim()
   const extraDirection = prompt.trim()
 
-  const sections = [
-    basePrompt,
-    `Brand: ${brandProfile.brand_name}`,
-    `Industry: ${brandProfile.industry}`,
-    `Visual style: ${settingsStyle}`,
-    `Use brand colors as guidance — primary ${brandProfile.color_primary}, secondary ${brandProfile.color_secondary}, accent ${brandProfile.color_accent}.`,
+  const sections = [basePrompt, `Visual style: ${settingsStyle}`]
+
+  if (brandProfile) {
+    sections.push(
+      `Brand: ${brandProfile.brand_name}`,
+      `Industry: ${brandProfile.industry}`,
+      `Use brand colors as guidance — primary ${brandProfile.color_primary}, secondary ${brandProfile.color_secondary}, accent ${brandProfile.color_accent}.`,
+    )
+  } else {
+    sections.push(
+      "No brand profile configured — create a polished, professional social media image suited to the caption.",
+    )
+  }
+
+  if (input.productContext) {
+    sections.push(
+      "## Featured Product / Service",
+      [
+        `Name: ${input.productContext.name}`,
+        input.productContext.description
+          ? `Description: ${input.productContext.description}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    )
+
+    if (input.hasProductImage) {
+      sections.push(
+        "A reference image of this product is provided. Incorporate or feature this product prominently in the generated image while matching the brand visual style.",
+      )
+    }
+  }
+
+  sections.push(
     "## Post caption / content",
     caption || "(No post content yet — create a visual that fits the brand and any extra direction below.)",
-  ]
+  )
 
   if (extraDirection) {
     sections.push("## Additional image direction", extraDirection)

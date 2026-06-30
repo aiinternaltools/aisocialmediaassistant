@@ -46,9 +46,15 @@ import { BUCKET_CONFIG } from "@/services/storage/constants"
 
 const ASPECT_RATIO_OPTIONS: { value: ImageAspectRatio; label: string }[] = [
   { value: "square", label: "Square (1024×1024)" },
-  { value: "portrait", label: "Portrait (768×1024)" },
-  { value: "landscape", label: "Landscape (1024×768)" },
+  { value: "portrait", label: "Portrait (864×1184)" },
+  { value: "landscape", label: "Landscape (1184×864)" },
 ]
+
+export type ProductContextForMedia = {
+  name: string
+  description?: string | null
+  imageStoragePath?: string | null
+}
 
 interface MediaSectionProps {
   postId?: string
@@ -57,6 +63,7 @@ interface MediaSectionProps {
   initialMedia?: PostMediaWithUrl | null
   mediaType: "none" | "image" | "video"
   onMediaTypeChange: (value: "none" | "image" | "video") => void
+  productContext?: ProductContextForMedia | null
 }
 
 export function MediaSection({
@@ -66,6 +73,7 @@ export function MediaSection({
   initialMedia = null,
   mediaType,
   onMediaTypeChange,
+  productContext,
 }: MediaSectionProps) {
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
@@ -144,6 +152,10 @@ export function MediaSection({
       prompt: trimmedPrompt,
       postContent: trimmedContent,
       aspectRatio,
+      productContext: productContext
+        ? { name: productContext.name, description: productContext.description }
+        : null,
+      productImageStoragePath: productContext?.imageStoragePath ?? null,
     })
     setIsGenerating(false)
 
@@ -256,7 +268,7 @@ export function MediaSection({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={isUploading || isGenerating || !brandProfileComplete}
+                  disabled={isUploading || isGenerating}
                   onClick={() => setGenerateDialogOpen(true)}
                 >
                   <Sparkles className="size-3.5" />
@@ -334,7 +346,7 @@ export function MediaSection({
             type="button"
             variant="outline"
             className="h-auto flex-col gap-2 py-6"
-            disabled={isUploading || isGenerating || !brandProfileComplete}
+            disabled={isUploading || isGenerating}
             onClick={() => setGenerateDialogOpen(true)}
           >
             <Sparkles className="size-5" />
@@ -367,13 +379,14 @@ export function MediaSection({
       {!brandProfileComplete ? (
         <Alert>
           <Sparkles className="size-4" />
-          <AlertTitle>Brand profile required for AI images</AlertTitle>
+          <AlertTitle>Brand profile recommended</AlertTitle>
           <AlertDescription>
-            Configure your{" "}
+            AI images work without a brand profile, but results improve when
+            you{" "}
             <Link href="/settings" className="font-medium underline">
-              Brand Profile
-            </Link>{" "}
-            to generate on-brand images.
+              configure your Brand Profile
+            </Link>
+            .
           </AlertDescription>
         </Alert>
       ) : null}
@@ -418,6 +431,18 @@ export function MediaSection({
           </DialogHeader>
 
           <div className="space-y-4">
+            {productContext && (
+              <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                <span className="font-medium text-primary">Product:</span>
+                <span className="text-foreground">{productContext.name}</span>
+                {productContext.imageStoragePath && (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    (image included as reference)
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Post content used for the image</Label>
               <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">

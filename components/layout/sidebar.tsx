@@ -9,6 +9,8 @@ import {
   ChevronRight,
   FileText,
   LayoutDashboard,
+  Megaphone,
+  Package,
   Settings,
 } from "lucide-react"
 import { useEffect, useState } from "react"
@@ -39,6 +41,16 @@ const navItems = [
     title: "Calendar",
     href: "/calendar",
     icon: CalendarDays,
+  },
+  {
+    title: "Marketing Strategy",
+    href: "/marketing-strategy",
+    icon: Megaphone,
+  },
+  {
+    title: "Products",
+    href: "/products",
+    icon: Package,
   },
   {
     title: "Settings",

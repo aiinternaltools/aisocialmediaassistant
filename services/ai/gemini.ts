@@ -14,11 +14,31 @@ import { createAdminClient } from "@/services/supabase/admin"
 
 const ASPECT_RATIO_DIMENSIONS: Record<
   ImageAspectRatio,
-  { width: number; height: number; size: string }
+  {
+    width: number
+    height: number
+    size: string
+    geminiAspectRatio: string
+  }
 > = {
-  square: { width: 1024, height: 1024, size: "1024x1024" },
-  portrait: { width: 768, height: 1024, size: "768x1024" },
-  landscape: { width: 1024, height: 768, size: "1024x768" },
+  square: {
+    width: 1024,
+    height: 1024,
+    size: "1024x1024",
+    geminiAspectRatio: "1:1",
+  },
+  portrait: {
+    width: 864,
+    height: 1184,
+    size: "864x1184",
+    geminiAspectRatio: "3:4",
+  },
+  landscape: {
+    width: 1184,
+    height: 864,
+    size: "1184x864",
+    geminiAspectRatio: "4:3",
+  },
 }
 
 const IMAGE_GENERATION_MODEL = GEMINI_IMAGE_GENERATION_MODEL
@@ -27,10 +47,12 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9.-]/g, "_")
 }
 
+type AspectRatioDimensions = (typeof ASPECT_RATIO_DIMENSIONS)[ImageAspectRatio]
+
 function resolveAspectRatio(
   aspectRatio: ImageAspectRatio,
   settingsSize: string,
-): { width: number; height: number; size: string } {
+): AspectRatioDimensions {
   if (aspectRatio) {
     return ASPECT_RATIO_DIMENSIONS[aspectRatio]
   }
@@ -56,6 +78,8 @@ export async function generateImage(
     brandProfile: input.brandProfile,
     settingsStyle: input.settings.gemini_image_style,
     defaultImagePrompt: input.settings.default_image_prompt,
+    productContext: input.productContext,
+    hasProductImage: Boolean(input.productImageBytes),
   })
 
   const genAI = getGeminiClient()
@@ -63,16 +87,31 @@ export async function generateImage(
     model: IMAGE_GENERATION_MODEL,
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
+      imageConfig: {
+        aspectRatio: dimensions.geminiAspectRatio,
+      },
     } as Record<string, unknown>,
   })
 
   let imageBase64: string | null = null
   let mimeType = "image/png"
 
+  const promptText = `${fullPrompt}\n\nRequired output aspect ratio: ${dimensions.geminiAspectRatio} (${dimensions.size}). Do not output a square image unless 1:1 was requested.`
+
+  const contentParts: unknown[] = input.productImageBytes
+    ? [
+        {
+          inlineData: {
+            mimeType: input.productImageBytes.mimeType,
+            data: input.productImageBytes.data.toString("base64"),
+          },
+        },
+        promptText,
+      ]
+    : [promptText]
+
   try {
-    const result = await model.generateContent(
-      `${fullPrompt}\n\nAspect ratio: ${dimensions.size}.`,
-    )
+    const result = await model.generateContent(contentParts as Parameters<typeof model.generateContent>[0])
 
     const parts = result.response.candidates?.[0]?.content?.parts ?? []
 

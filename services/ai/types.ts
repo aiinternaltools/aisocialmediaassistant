@@ -14,6 +14,21 @@ export type AiTextOperation =
 
 export type ImageAspectRatio = "square" | "portrait" | "landscape"
 
+export type ProductContext = {
+  name: string
+  description?: string | null
+}
+
+export type StrategyStepPromptContext = {
+  day: number
+  totalDays: number
+  content_type: string
+  topic: string
+  objective: string
+  notes?: string
+  product_reference?: string
+}
+
 export type BuildPromptInput = {
   brandProfile: BrandProfileRow | null
   postContent: string
@@ -25,6 +40,8 @@ export type BuildPromptInput = {
   tone?: string
   defaultTextPrompt?: string | null
   defaultTextLengthPrompt?: string | null
+  productContext?: ProductContext | null
+  strategyStep?: StrategyStepPromptContext | null
 }
 
 export type TextCompletionContext = {
@@ -36,6 +53,8 @@ export type TextCompletionContext = {
   userInstruction?: string
   targetLanguage?: string
   tone?: string
+  productContext?: ProductContext | null
+  strategyStep?: StrategyStepPromptContext | null
 }
 
 export type TextCompletionResult = {
@@ -51,9 +70,11 @@ export type GenerateImageInput = {
   prompt: string
   postContent: string
   aspectRatio: ImageAspectRatio
-  brandProfile: BrandProfileRow
+  brandProfile: BrandProfileRow | null
   settings: SettingsBundle
   userId: string
+  productContext?: ProductContext | null
+  productImageBytes?: { data: Buffer; mimeType: string } | null
 }
 
 export type GenerateImageResult = {

@@ -11,6 +11,8 @@ import { getPlatforms, getPost } from "@/features/posts/actions"
 import { PostEditor } from "@/features/posts/components/post-editor"
 import { PostStatusBadge } from "@/features/posts/components/post-status-badge"
 import { getPostMedia } from "@/features/posts/media-actions"
+import { getProducts } from "@/features/products/actions"
+import { getActiveCampaign } from "@/features/marketing-strategy/actions"
 
 export async function generateMetadata({
   params,
@@ -35,12 +37,14 @@ interface EditPostPageProps {
 
 export default async function EditPostPage({ params }: EditPostPageProps) {
   const { id } = await params
-  const [postResult, platformsResult, brandResult, mediaResult] =
+  const [postResult, platformsResult, brandResult, mediaResult, productsResult, activeCampaignResult] =
     await Promise.all([
       getPost(id),
       getPlatforms(),
       getBrandProfile(),
       getPostMedia(id),
+      getProducts(),
+      getActiveCampaign(),
     ])
 
   if (!postResult.success) {
@@ -59,6 +63,10 @@ export default async function EditPostPage({ params }: EditPostPageProps) {
   const post = postResult.data
   const brandProfile = brandResult.success ? brandResult.data : null
   const postMedia = mediaResult.success ? mediaResult.data : null
+  const products = productsResult.success ? productsResult.data : []
+  const activeCampaign = activeCampaignResult.success
+    ? activeCampaignResult.data
+    : null
 
   const scheduleHint = post.scheduled_at
     ? `Scheduled for ${formatScheduleDisplay(post.scheduled_at, post.timezone)} (${post.timezone})`
@@ -100,6 +108,8 @@ export default async function EditPostPage({ params }: EditPostPageProps) {
           brand_profile_id: post.brand_profile_id ?? brandProfile?.id ?? null,
         }}
         currentStatus={post.status}
+        products={products}
+        activeCampaign={activeCampaign}
       />
     </div>
   )

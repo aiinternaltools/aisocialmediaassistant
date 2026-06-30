@@ -26,6 +26,8 @@ async function runTextOperation(
     tone: context.tone,
     defaultTextPrompt: context.settings.default_text_prompt,
     defaultTextLengthPrompt: context.settings.default_text_length_prompt,
+    productContext: context.productContext,
+    strategyStep: context.strategyStep,
   })
 
   const genAI = getGeminiClient()
