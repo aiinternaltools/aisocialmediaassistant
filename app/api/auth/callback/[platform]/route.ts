@@ -12,6 +12,7 @@ import {
 } from "@/features/integrations/registry"
 import { IntegrationError } from "@/features/integrations/shared/errors"
 import { requireAuth } from "@/lib/auth/require-auth"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 
 type RouteContext = {
   params: Promise<{ platform: string }>
@@ -52,12 +53,13 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   try {
-    const user = await requireAuth()
+    await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const connector = getConnector(platform)
     const redirectUri = getOAuthRedirectUri(platform)
     const tokens = await connector.exchangeCode(code, redirectUri)
 
-    await upsertPlatformConnectionFromOAuth(user.id, platform, tokens)
+    await upsertPlatformConnectionFromOAuth(workspaceUserId, platform, tokens)
 
     return NextResponse.redirect(`${settingsUrl}&connected=${platform}`)
   } catch (error) {

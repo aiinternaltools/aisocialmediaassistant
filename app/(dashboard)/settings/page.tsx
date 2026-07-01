@@ -24,6 +24,7 @@ import {
   mapSettingsToAppForm,
 } from "@/features/settings/lib/mappers"
 import { requireAuth } from "@/lib/auth/require-auth"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -34,7 +35,8 @@ type SettingsPageProps = {
 }
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
-  const user = await requireAuth()
+  await requireAuth()
+  const workspaceUserId = await getWorkspaceUserId()
   const { tab, connected, error: oauthError } = await searchParams
   const defaultTab =
     tab === "social" || tab === "ai" || tab === "app" || tab === "brand"
@@ -71,7 +73,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     ? mapSettingsToAiForm(settings)
     : mapSettingsToAiForm({
         id: "",
-        user_id: user.id,
+        user_id: workspaceUserId,
         created_at: "",
         updated_at: "",
         timezone: "UTC",
@@ -98,7 +100,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     : mapSettingsToAppForm(
         {
           id: "",
-          user_id: user.id,
+          user_id: workspaceUserId,
           created_at: "",
           updated_at: "",
           timezone: "UTC",
@@ -157,7 +159,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </TabsList>
 
         <TabsContent value="brand" className="mt-6">
-          <BrandProfileForm userId={user.id} initialProfile={brandProfile} />
+          <BrandProfileForm userId={workspaceUserId} initialProfile={brandProfile} />
         </TabsContent>
 
         <TabsContent value="ai" className="mt-6">

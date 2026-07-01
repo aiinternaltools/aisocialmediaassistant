@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { isAdminEmail } from "@/lib/auth/admin"
+import { setupWorkspaceAfterLogin } from "@/lib/auth/workspace"
 import { createClient } from "@/services/supabase/server"
 
 export async function GET(request: Request) {
@@ -25,6 +26,10 @@ export async function GET(request: Request) {
   if (!isAdminEmail(user?.email)) {
     await supabase.auth.signOut()
     return NextResponse.redirect(`${origin}/login?error=unauthorized`)
+  }
+
+  if (user) {
+    await setupWorkspaceAfterLogin(user.id)
   }
 
   return NextResponse.redirect(`${origin}/`)

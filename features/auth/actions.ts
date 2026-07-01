@@ -4,6 +4,7 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 
 import { isAdminEmail } from "@/lib/auth/admin"
+import { setupWorkspaceAfterLogin } from "@/lib/auth/workspace"
 import { createClient } from "@/services/supabase/server"
 
 async function getOrigin(): Promise<string> {
@@ -51,6 +52,10 @@ export async function signInWithEmail(formData: {
   if (!isAdminEmail(user?.email)) {
     await supabase.auth.signOut()
     redirect("/login?error=unauthorized")
+  }
+
+  if (user) {
+    await setupWorkspaceAfterLogin(user.id)
   }
 
   redirect("/")

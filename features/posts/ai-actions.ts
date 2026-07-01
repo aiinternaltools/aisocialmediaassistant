@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { AppError } from "@/lib/errors/app-error"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 import { logAiGeneration } from "@/services/ai/guards"
 import {
   changeTone,
@@ -41,21 +42,7 @@ export type AiTextActionInput = {
 type AiTextActionResult = { text: string }
 
 async function getAuthenticatedUserId(): Promise<string> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new AppError({
-      code: "UNAUTHORIZED",
-      message: "Not authenticated",
-      userMessage: "You must be signed in to continue.",
-    })
-  }
-
-  return user.id
+  return getWorkspaceUserId()
 }
 
 async function loadBrandProfile(

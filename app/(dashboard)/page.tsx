@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { redirect } from "next/navigation"
 
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -14,24 +13,17 @@ import {
   getRecentPosts,
   getUpcomingScheduled,
 } from "@/features/dashboard/queries"
-import { createClient } from "@/services/supabase/server"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
+  const workspaceUserId = await getWorkspaceUserId()
 
   const [stats, recentPosts, upcomingScheduled, recentActivity] =
     await Promise.all([
-      getDashboardStats(user.id),
-      getRecentPosts(user.id),
-      getUpcomingScheduled(user.id),
-      getRecentActivity(user.id),
+      getDashboardStats(workspaceUserId),
+      getRecentPosts(workspaceUserId),
+      getUpcomingScheduled(workspaceUserId),
+      getRecentActivity(workspaceUserId),
     ])
 
   return (

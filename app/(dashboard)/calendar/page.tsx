@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { redirect } from "next/navigation"
 
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -13,7 +12,7 @@ import {
   parseMonthParam,
 } from "@/features/calendar/lib/calendar-utils"
 import { getCalendarPosts } from "@/features/calendar/queries"
-import { createClient } from "@/services/supabase/server"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 
 interface CalendarPageProps {
   searchParams: Promise<{
@@ -23,21 +22,14 @@ interface CalendarPageProps {
 }
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
+  const workspaceUserId = await getWorkspaceUserId()
 
   const params = await searchParams
   const month = parseMonthParam(params.month)
   const dateParam = parseDateParam(params.date)
   const { gridStart, gridEnd } = getCalendarGrid(month)
 
-  const posts = await getCalendarPosts(user.id, gridStart, gridEnd)
+  const posts = await getCalendarPosts(workspaceUserId, gridStart, gridEnd)
   const postsByDay = groupPostsByDay(posts)
   const selectedDate = getDefaultSelectedDate(month, dateParam, postsByDay)
 

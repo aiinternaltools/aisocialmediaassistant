@@ -22,6 +22,7 @@ import {
 } from "@/features/integrations/shared/token-encryption"
 import type { PlatformConnectionView } from "@/features/integrations/types"
 import { requireAuth } from "@/lib/auth/require-auth"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 import { AppError } from "@/lib/errors/app-error"
 import { createClient } from "@/services/supabase/server"
 import type { ActionResult } from "@/types/app"
@@ -98,7 +99,7 @@ export async function connectPlatform(
 /** Connect Facebook using FACEBOOK_PAGE_ACCESS_TOKEN (same approach as n8n). */
 export async function connectFacebookWithEnvToken(): Promise<ActionResult> {
   try {
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
 
     if (!hasEnvFacebookPageToken()) {
       throw new AppError({
@@ -110,7 +111,7 @@ export async function connectFacebookWithEnvToken(): Promise<ActionResult> {
     }
 
     const tokens = await buildFacebookTokensFromEnv()
-    await upsertPlatformConnectionFromOAuth(user.id, "facebook", tokens)
+    await upsertPlatformConnectionFromOAuth(workspaceUserId, "facebook", tokens)
 
     revalidatePath(SETTINGS_PATH)
     return { success: true, data: undefined }
@@ -123,7 +124,7 @@ export async function disconnectPlatform(
   platformId: string,
 ): Promise<ActionResult> {
   try {
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
 
     const { data, error } = await supabase
@@ -135,7 +136,7 @@ export async function disconnectPlatform(
         token_expires_at: null,
         updated_at: new Date().toISOString(),
       })
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceUserId)
       .eq("platform_id", platformId)
       .select("id")
       .maybeSingle()
@@ -167,13 +168,13 @@ export async function refreshConnection(
   platformId: string,
 ): Promise<ActionResult<PlatformConnectionView>> {
   try {
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
 
     const { data: connection, error: fetchError } = await supabase
       .from("platform_connections")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceUserId)
       .eq("platform_id", platformId)
       .maybeSingle()
 
@@ -261,13 +262,13 @@ export async function getConnections(): Promise<
   ActionResult<PlatformConnectionView[]>
 > {
   try {
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("platform_connections")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceUserId)
       .neq("status", "disconnected")
 
     if (error) {

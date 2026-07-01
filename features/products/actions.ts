@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import sharp from "sharp"
 import OpenAI from "openai"
 
-import { requireAuth } from "@/lib/auth/require-auth"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 import { AppError } from "@/lib/errors/app-error"
 import {
   productFormSchema,
@@ -28,21 +28,7 @@ export type ProductRow = Tables<"products">
 const PRODUCTS_PATH = "/products"
 
 async function getAuthUserId(): Promise<string> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new AppError({
-      code: "UNAUTHORIZED",
-      message: "Not authenticated",
-      userMessage: "You must be signed in to continue.",
-    })
-  }
-
-  return user.id
+  return getWorkspaceUserId()
 }
 
 type AiExtractionResult = {
@@ -341,8 +327,7 @@ export async function extractFromUrl(
   productType: ProductType,
 ): Promise<ActionResult<ExtractResult>> {
   try {
-    const user = await requireAuth()
-    const settings = await loadSettings(user.id)
+    const settings = await loadSettings(await getWorkspaceUserId())
 
     let html: string
     try {

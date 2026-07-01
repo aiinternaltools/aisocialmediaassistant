@@ -594,9 +594,60 @@ export type Database = {
         };
         Relationships: [];
       };
+      workspace_members: {
+        Row: {
+          created_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      workspace_settings: {
+        Row: {
+          id: number;
+          owner_user_id: string | null;
+        };
+        Insert: {
+          id?: number;
+          owner_user_id?: string | null;
+        };
+        Update: {
+          id?: number;
+          owner_user_id?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      bootstrap_workspace_owner: {
+        Args: { p_claimant: string };
+        Returns: string;
+      };
+      is_workspace_member: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      owns_workspace_row: {
+        Args: { row_user_id: string };
+        Returns: boolean;
+      };
+      pin_workspace_owner: {
+        Args: { p_owner: string };
+        Returns: string;
+      };
+      workspace_owner_id: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+    };
     Enums: {
       ai_provider: "openai" | "gemini";
       connection_status: "connected" | "expired" | "error" | "disconnected";

@@ -1,6 +1,6 @@
 # AI Social Media Assistant
 
-Production-ready AI-powered social media management app for a single administrator. Create posts, generate AI content and images, connect social accounts, schedule publications, and publish automatically.
+Production-ready AI-powered social media management app for a shared workspace team. Multiple admins can sign in and manage the same posts, brand, settings, and social connections. Create posts, generate AI content and images, connect social accounts, schedule publications, and publish automatically.
 
 ## Tech Stack
 
@@ -23,7 +23,7 @@ Production-ready AI-powered social media management app for a single administrat
 ```bash
 cd web
 cp .env.example .env.local
-# Fill in Supabase URL, anon key, service role key, ADMIN_EMAIL, API keys
+# Fill in Supabase URL, anon key, service role key, ADMIN_EMAILS, API keys
 npm install
 npm run dev
 ```
@@ -39,12 +39,26 @@ See [`.env.example`](.env.example). Required for local dev:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role (cron, image upload, publishing) |
-| `ADMIN_EMAIL` | Only this email may sign in |
+| `ADMIN_EMAILS` | Comma-separated emails allowed to sign in (e.g. `you@co.com,partner@co.com`) |
+| `ADMIN_EMAIL` | Optional fallback if `ADMIN_EMAILS` is unset (single admin) |
+| `WORKSPACE_OWNER_USER_ID` | Optional. Pin workspace owner UUID when migrating existing data (copy from Supabase Auth → Users → UID) |
 | `OPENAI_API_KEY` | OpenAI text generation |
 | `GEMINI_API_KEY` | Gemini image generation |
 | `CRON_SECRET` | Secures `/api/cron/publish` |
 | `TOKEN_ENCRYPTION_KEY` | Encrypts social OAuth tokens at rest |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` in dev |
+
+### Shared workspace
+
+All allowlisted admins share one dataset (posts, brand, settings, Facebook connection, storage). Social and AI keys remain project-level env vars.
+
+**Existing project with data:** set `WORKSPACE_OWNER_USER_ID` to the Supabase UID of the user who already owns your posts/brand/connections **before** other admins sign in.
+
+**Fresh install:** set only `ADMIN_EMAILS`. The first allowlisted admin to log in becomes the workspace owner automatically.
+
+**Add an admin:** create the user in Supabase Auth, add their email to `ADMIN_EMAILS`, redeploy.
+
+**Remove an admin:** remove their email from `ADMIN_EMAILS`, redeploy, optionally disable/delete their Auth user.
 
 Meta (optional — dev stub works without):
 
@@ -61,8 +75,8 @@ Meta (optional — dev stub works without):
 2. **Authentication → URL Configuration**
    - Site URL: `http://localhost:3000`
    - Redirect URLs: `http://localhost:3000/auth/callback`
-3. Disable public signups (single admin only)
-4. Create admin user manually OR sign in with Google using `ADMIN_EMAIL`
+3. Disable public signups (admin allowlist only)
+4. Create admin users manually OR sign in with Google using an email from `ADMIN_EMAILS`
 
 Google Cloud redirect URI:
 
@@ -72,11 +86,11 @@ https://zbrltkrcwfktrglkxaha.supabase.co/auth/v1/callback
 
 ### Database
 
-Migrations are applied via Supabase MCP. Schema includes: `profiles`, `settings`, `brand_profiles`, `posts`, `platforms`, `platform_connections`, `scheduled_jobs`, `publication_logs`, `ai_generations`.
+Migrations are applied via Supabase MCP. Schema includes: `profiles`, `settings`, `brand_profiles`, `posts`, `platforms`, `platform_connections`, `scheduled_jobs`, `publication_logs`, `ai_generations`, `workspace_settings`, `workspace_members`.
 
 ### Storage Buckets
 
-`logos`, `images`, `videos`, `generated-images`, `brand-assets` — user-scoped paths: `{bucket}/{userId}/filename`.
+`logos`, `images`, `videos`, `generated-images`, `brand-assets` — workspace-scoped paths: `{bucket}/{workspaceOwnerUserId}/filename` (all admins share the owner prefix).
 
 ### Cron (Scheduled Publishing)
 
@@ -132,8 +146,9 @@ npm run lint     # ESLint
 
 ## E2E Test Checklist
 
-- [ ] Sign in with Google (`ADMIN_EMAIL` account)
-- [ ] Unauthorized email rejected at `/auth/callback`
+- [ ] Sign in with Google (an `ADMIN_EMAILS` account)
+- [ ] Unauthorized email rejected at `/auth/callback` and on protected routes
+- [ ] Second admin sees same posts, brand, settings, and Facebook connection
 - [ ] Email/password fallback login works
 - [ ] Configure Brand Profile → `is_complete` becomes true
 - [ ] AI text actions blocked until brand complete
@@ -155,4 +170,4 @@ npm run lint     # ESLint
 
 ## License
 
-Private — single-admin internal tool.
+Private — shared-workspace internal tool.

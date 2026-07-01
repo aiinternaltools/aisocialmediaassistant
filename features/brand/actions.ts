@@ -12,7 +12,7 @@ import {
   computeBrandProfileComplete,
   getDefaultBrandProfile,
 } from "@/features/brand/guards"
-import { requireAuth } from "@/lib/auth/require-auth"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 import { AppError } from "@/lib/errors/app-error"
 import {
   brandProfileFormSchema,
@@ -87,13 +87,13 @@ export async function getBrandProfile(): Promise<
   ActionResult<BrandProfileWithAssets | null>
 > {
   try {
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
 
     const { data, error } = await supabase
       .from("brand_profiles")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceUserId)
       .eq("is_default", true)
       .is("deleted_at", null)
       .maybeSingle()
@@ -125,12 +125,12 @@ export async function upsertBrandProfile(
 ): Promise<ActionResult<BrandProfileWithAssets>> {
   try {
     const parsed = brandProfileFormSchema.parse(values)
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
     const isComplete = computeBrandProfileComplete(parsed)
 
     const payload: TablesInsert<"brand_profiles"> = {
-      user_id: user.id,
+      user_id: workspaceUserId,
       brand_name: parsed.brand_name.trim(),
       business_description: parsed.business_description.trim(),
       industry: parsed.industry.trim(),
@@ -162,7 +162,7 @@ export async function upsertBrandProfile(
         .from("brand_profiles")
         .update(payload)
         .eq("id", profileId)
-        .eq("user_id", user.id)
+        .eq("user_id", workspaceUserId)
         .select("*")
         .single()
 
@@ -245,7 +245,7 @@ export async function uploadLogo(
   ActionResult<{ storagePath: string; signedUrl: string; profileId?: string }>
 > {
   try {
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const file = formData.get("file")
 
     if (!(file instanceof File)) {
@@ -263,7 +263,7 @@ export async function uploadLogo(
     }
 
     const supabase = await createClient()
-    const storagePath = `${user.id}/${Date.now()}-${sanitizeFileName(file.name)}`
+    const storagePath = `${workspaceUserId}/${Date.now()}-${sanitizeFileName(file.name)}`
 
     const { error: uploadError } = await supabase.storage
       .from("logos")
@@ -283,7 +283,7 @@ export async function uploadLogo(
     const { data: existingProfile } = await supabase
       .from("brand_profiles")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceUserId)
       .eq("is_default", true)
       .is("deleted_at", null)
       .maybeSingle()
@@ -298,7 +298,7 @@ export async function uploadLogo(
           updated_at: new Date().toISOString(),
         })
         .eq("id", profileId)
-        .eq("user_id", user.id)
+        .eq("user_id", workspaceUserId)
 
       if (updateError) {
         throw new AppError({
@@ -308,7 +308,7 @@ export async function uploadLogo(
         })
       }
     } else {
-      const defaults = getDefaultBrandProfile(user.id)
+      const defaults = getDefaultBrandProfile(workspaceUserId)
       const { data: createdProfile, error: createError } = await supabase
         .from("brand_profiles")
         .insert({
@@ -353,7 +353,7 @@ export async function uploadBrandAsset(
   formData: FormData,
 ): Promise<ActionResult<BrandAssetRow>> {
   try {
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const file = formData.get("file")
     const brandProfileId = formData.get("brand_profile_id")
     const assetType = formData.get("asset_type")
@@ -389,7 +389,7 @@ export async function uploadBrandAsset(
       .from("brand_profiles")
       .select("id")
       .eq("id", brandProfileId)
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceUserId)
       .is("deleted_at", null)
       .maybeSingle()
 
@@ -397,7 +397,7 @@ export async function uploadBrandAsset(
       return { success: false, error: "Brand profile not found." }
     }
 
-    const storagePath = `${user.id}/${Date.now()}-${sanitizeFileName(file.name)}`
+    const storagePath = `${workspaceUserId}/${Date.now()}-${sanitizeFileName(file.name)}`
 
     const { error: uploadError } = await supabase.storage
       .from("brand-assets")

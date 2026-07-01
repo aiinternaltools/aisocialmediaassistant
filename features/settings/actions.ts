@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
 import { requireAuth } from "@/lib/auth/require-auth"
+import { getWorkspaceUserId } from "@/lib/auth/workspace"
 import { AppError } from "@/lib/errors/app-error"
 import {
   aiSettingsSchema,
@@ -86,8 +87,8 @@ async function ensureSettings(userId: string): Promise<SettingsBundle> {
 
 export async function getSettings(): Promise<ActionResult<SettingsBundle>> {
   try {
-    const user = await requireAuth()
-    const settings = await ensureSettings(user.id)
+    const workspaceUserId = await getWorkspaceUserId()
+    const settings = await ensureSettings(workspaceUserId)
     return { success: true, data: settings }
   } catch (error) {
     return {
@@ -102,9 +103,9 @@ export async function updateAiSettings(
 ): Promise<ActionResult<SettingsBundle>> {
   try {
     const parsed = aiSettingsSchema.parse(values)
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
-    await ensureSettings(user.id)
+    await ensureSettings(workspaceUserId)
 
     const { data, error } = await supabase
       .from("settings")
@@ -121,7 +122,7 @@ export async function updateAiSettings(
         default_text_length_prompt: parsed.default_text_length_prompt.trim(),
         updated_at: new Date().toISOString(),
       })
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceUserId)
       .select("*")
       .single()
 
@@ -155,9 +156,9 @@ export async function updateAppSettings(
 ): Promise<ActionResult<SettingsBundle>> {
   try {
     const parsed = appSettingsSchema.parse(values)
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
-    await ensureSettings(user.id)
+    await ensureSettings(workspaceUserId)
 
     const { data, error } = await supabase
       .from("settings")
@@ -168,7 +169,7 @@ export async function updateAppSettings(
         default_platform_ids: parsed.default_platform_ids,
         updated_at: new Date().toISOString(),
       })
-      .eq("user_id", user.id)
+      .eq("user_id", workspaceUserId)
       .select("*")
       .single()
 
@@ -229,7 +230,7 @@ export async function getPlatformConnections(): Promise<
   ActionResult<PlatformWithConnection[]>
 > {
   try {
-    const user = await requireAuth()
+    const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
 
     const [platformsResult, connectionsResult] = await Promise.all([
@@ -241,7 +242,7 @@ export async function getPlatformConnections(): Promise<
       supabase
         .from("platform_connections")
         .select("*")
-        .eq("user_id", user.id),
+        .eq("user_id", workspaceUserId),
     ])
 
     if (platformsResult.error) {

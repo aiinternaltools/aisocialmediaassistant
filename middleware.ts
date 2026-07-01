@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+import { isAdminEmail } from "@/lib/auth/admin"
 import { updateSession } from "@/services/supabase/middleware"
 
 const AUTH_ROUTES = ["/login"]
@@ -36,6 +37,13 @@ export async function middleware(request: NextRequest) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = "/"
     redirectUrl.search = ""
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  if (user && isProtectedRoute(pathname) && !isAdminEmail(user.email)) {
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = "/login"
+    redirectUrl.searchParams.set("error", "unauthorized")
     return NextResponse.redirect(redirectUrl)
   }
 
