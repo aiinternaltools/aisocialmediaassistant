@@ -107,9 +107,10 @@ export async function ensureWorkspaceMember(userId: string): Promise<void> {
   const supabase = await createClient()
   const { error } = await supabase
     .from("workspace_members")
-    .upsert({ user_id: userId }, { onConflict: "user_id" })
+    .insert({ user_id: userId })
 
-  if (error) {
+  // Owner may already be inserted by pin/bootstrap RPC; ignore duplicate key.
+  if (error && error.code !== "23505") {
     throw new AppError({
       code: "INTERNAL",
       message: error.message,
