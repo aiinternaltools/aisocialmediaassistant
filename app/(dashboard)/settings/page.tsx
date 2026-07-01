@@ -19,6 +19,7 @@ import { AiSettingsForm } from "@/features/settings/components/ai-settings-form"
 import { AppSettingsForm } from "@/features/settings/components/app-settings-form"
 import { SocialConnections } from "@/features/settings/components/social-connections"
 import { hasEnvFacebookPageToken } from "@/features/integrations/facebook/env-token"
+import { hasEnvOpenAiApiKey } from "@/services/ai/env"
 import {
   mapSettingsToAiForm,
   mapSettingsToAppForm,
@@ -69,8 +70,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     !connectionsResult.success ? connectionsResult.error : null,
   ].filter(Boolean)
 
+  const openAiAvailable = hasEnvOpenAiApiKey()
+
   const aiDefaults = settings
-    ? mapSettingsToAiForm(settings)
+    ? mapSettingsToAiForm(settings, { openAiAvailable })
     : mapSettingsToAiForm({
         id: "",
         user_id: workspaceUserId,
@@ -80,7 +83,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         date_format: "MM/dd/yyyy",
         default_post_status: "draft",
         default_platform_ids: [],
-        text_ai_provider: "openai",
+        text_ai_provider: "gemini",
         openai_model: "gpt-4o-mini",
         openai_temperature: 0.7,
         openai_max_tokens: 1024,
@@ -107,7 +110,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           date_format: "MM/dd/yyyy",
           default_post_status: "draft",
           default_platform_ids: [],
-          text_ai_provider: "openai",
+          text_ai_provider: "gemini",
           openai_model: "gpt-4o-mini",
           openai_temperature: 0.7,
           openai_max_tokens: 1024,
@@ -163,7 +166,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         </TabsContent>
 
         <TabsContent value="ai" className="mt-6">
-          <AiSettingsForm defaultValues={aiDefaults} />
+          <AiSettingsForm
+            defaultValues={aiDefaults}
+            openAiAvailable={hasEnvOpenAiApiKey()}
+          />
         </TabsContent>
 
         <TabsContent value="social" className="mt-6">

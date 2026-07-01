@@ -14,6 +14,7 @@ import {
   DEFAULT_GEMINI_TEXT_MODEL,
   resolveGeminiTextModel,
 } from "@/services/ai/gemini-models"
+import { hasEnvOpenAiApiKey } from "@/services/ai/env"
 
 function normalizeEnum<const T extends readonly string[]>(
   value: string | null | undefined,
@@ -36,13 +37,21 @@ function normalizeGeminiModel(
 
 export function mapSettingsToAiForm(
   settings: SettingsBundle,
+  options?: { openAiAvailable?: boolean },
 ): AiSettingsFormValues {
+  const openAiAvailable = options?.openAiAvailable ?? hasEnvOpenAiApiKey()
+  let textAiProvider = normalizeEnum(
+    settings.text_ai_provider,
+    TEXT_AI_PROVIDER_OPTIONS,
+    "gemini",
+  )
+
+  if (textAiProvider === "openai" && !openAiAvailable) {
+    textAiProvider = "gemini"
+  }
+
   return {
-    text_ai_provider: normalizeEnum(
-      settings.text_ai_provider,
-      TEXT_AI_PROVIDER_OPTIONS,
-      "openai",
-    ),
+    text_ai_provider: textAiProvider,
     openai_model: normalizeEnum(
       settings.openai_model,
       OPENAI_MODEL_OPTIONS,

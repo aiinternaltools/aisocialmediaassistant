@@ -1,4 +1,4 @@
-import type { BrandProfileRow, ProductServiceItem } from "@/types/app"
+import type { BrandProfileRow } from "@/types/app"
 
 import { resolveDefaultImagePrompt, resolveDefaultTextPrompt, resolveDefaultTextLengthPrompt } from "./default-prompts"
 import type { AiTextOperation, BuildPromptInput } from "./types"
@@ -29,23 +29,6 @@ const OPERATION_INSTRUCTIONS: Record<AiTextOperation, string> = {
     "Shorten the post content while keeping the key message. Return only the shortened text.",
 }
 
-function formatProductsServices(products: unknown): string {
-  if (!Array.isArray(products) || products.length === 0) {
-    return "None specified"
-  }
-
-  return products
-    .map((item) => {
-      const product = item as ProductServiceItem
-      if (product.description) {
-        return `- ${product.name}: ${product.description}`
-      }
-
-      return `- ${product.name}`
-    })
-    .join("\n")
-}
-
 function buildBrandContext(brandProfile: BrandProfileRow): string {
   return [
     `Brand Name: ${brandProfile.brand_name}`,
@@ -55,7 +38,6 @@ function buildBrandContext(brandProfile: BrandProfileRow): string {
     `Brand Voice: ${brandProfile.brand_voice.join(", ")}`,
     `Writing Style: ${brandProfile.writing_style.join(", ")}`,
     `Brand Values: ${brandProfile.brand_values.join(", ")}`,
-    `Products & Services:\n${formatProductsServices(brandProfile.products_services)}`,
     `Preferred CTAs: ${brandProfile.preferred_ctas.join(", ")}`,
     `Keywords: ${brandProfile.keywords.length > 0 ? brandProfile.keywords.join(", ") : "None"}`,
     `Avoid Words: ${brandProfile.avoid_words.length > 0 ? brandProfile.avoid_words.join(", ") : "None"}`,
@@ -213,7 +195,14 @@ export function buildImagePrompt(input: {
 
     if (input.hasProductImage) {
       sections.push(
-        "A reference image of this product is provided. Incorporate or feature this product prominently in the generated image while matching the brand visual style.",
+        "## Product / service reference image (critical)",
+        [
+          "A reference image of this product or service is attached.",
+          "Do NOT alter, redraw, restyle, or replace the product/service itself — preserve its exact appearance, colors, shape, packaging, and proportions.",
+          "Do NOT apply filters, artistic effects, or brand color overlays to the product/service.",
+          "Place the reference product/service prominently and unchanged; build the background, scene, layout, and supporting elements around it.",
+          "Match the surrounding composition to the brand visual style without modifying the product/service image.",
+        ].join("\n"),
       )
     }
   }

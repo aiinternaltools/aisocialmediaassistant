@@ -26,38 +26,77 @@ import { cn } from "@/lib/utils"
 
 const STORAGE_KEY = "sidebar-collapsed"
 
-const navItems = [
+type NavItem = {
+  title: string
+  href: string
+  icon: typeof LayoutDashboard
+}
+
+type NavGroup = {
+  label: string
+  items: NavItem[]
+}
+
+const navGroups: NavGroup[] = [
   {
-    title: "Dashboard",
-    href: "/",
-    icon: LayoutDashboard,
+    label: "Overview",
+    items: [
+      {
+        title: "Dashboard",
+        href: "/",
+        icon: LayoutDashboard,
+      },
+    ],
   },
   {
-    title: "Posts",
-    href: "/posts",
-    icon: FileText,
+    label: "Content",
+    items: [
+      {
+        title: "Posts",
+        href: "/posts",
+        icon: FileText,
+      },
+      {
+        title: "Calendar",
+        href: "/calendar",
+        icon: CalendarDays,
+      },
+    ],
   },
   {
-    title: "Calendar",
-    href: "/calendar",
-    icon: CalendarDays,
+    label: "Strategy",
+    items: [
+      {
+        title: "Marketing Strategy",
+        href: "/marketing-strategy",
+        icon: Megaphone,
+      },
+      {
+        title: "Products",
+        href: "/products",
+        icon: Package,
+      },
+    ],
   },
   {
-    title: "Marketing Strategy",
-    href: "/marketing-strategy",
-    icon: Megaphone,
+    label: "Workspace",
+    items: [
+      {
+        title: "Settings",
+        href: "/settings",
+        icon: Settings,
+      },
+    ],
   },
-  {
-    title: "Products",
-    href: "/products",
-    icon: Package,
-  },
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
-] as const
+]
+
+function isNavItemActive(pathname: string, href: string): boolean {
+  if (href === "/") {
+    return pathname === "/"
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`)
+}
 
 function AppLogo({ collapsed }: { collapsed: boolean }) {
   return (
@@ -69,14 +108,13 @@ function AppLogo({ collapsed }: { collapsed: boolean }) {
       )}
       aria-label="AI Social Assistant home"
     >
-      <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 via-primary to-sky-500 text-white shadow-sm ring-1 ring-white/15">
+      <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-md shadow-sidebar-primary/25 ring-1 ring-white/20">
         <BotMessageSquare className="size-[1.125rem]" strokeWidth={2.25} />
-        <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-emerald-400 ring-2 ring-sidebar" />
       </span>
       {!collapsed ? (
-        <span className="truncate text-sm leading-tight">
+        <span className="truncate text-sm leading-tight text-sidebar-foreground">
           AI Social
-          <span className="block text-xs font-normal text-sidebar-foreground/60">
+          <span className="block text-xs font-normal text-sidebar-foreground/55">
             Assistant
           </span>
         </span>
@@ -90,24 +128,34 @@ function NavLink({
   isActive,
   collapsed,
 }: {
-  item: (typeof navItems)[number]
+  item: NavItem
   isActive: boolean
   collapsed: boolean
 }) {
   const Icon = item.icon
   const linkClassName = cn(
-    "flex items-center rounded-lg text-sm font-medium transition-colors",
-    collapsed ? "size-9 justify-center px-0" : "gap-3 px-3 py-2",
+    "group flex items-center rounded-xl text-sm transition-all duration-150",
+    collapsed ? "size-10 justify-center px-0" : "gap-3 px-3 py-2",
     isActive
-      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+      ? cn(
+          "bg-background font-semibold text-foreground shadow-sm ring-1 ring-sidebar-border/90",
+          collapsed && "ring-sidebar-primary/25",
+        )
+      : "font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+  )
+
+  const iconClassName = cn(
+    "size-4 shrink-0 transition-colors",
+    isActive
+      ? "text-sidebar-primary"
+      : "text-sidebar-foreground/45 group-hover:text-sidebar-foreground/80",
   )
 
   if (!collapsed) {
     return (
-      <Link href={item.href} className={linkClassName}>
-        <Icon className="size-4 shrink-0" />
-        {item.title}
+      <Link href={item.href} className={linkClassName} aria-current={isActive ? "page" : undefined}>
+        <Icon className={iconClassName} />
+        <span className="truncate">{item.title}</span>
       </Link>
     )
   }
@@ -120,15 +168,59 @@ function NavLink({
             href={item.href}
             className={linkClassName}
             aria-label={item.title}
+            aria-current={isActive ? "page" : undefined}
           />
         }
       >
-        <Icon className="size-4 shrink-0" />
+        <Icon className={iconClassName} />
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={8}>
         {item.title}
       </TooltipContent>
     </Tooltip>
+  )
+}
+
+function NavGroupSection({
+  group,
+  pathname,
+  collapsed,
+  showDivider,
+}: {
+  group: NavGroup
+  pathname: string
+  collapsed: boolean
+  showDivider: boolean
+}) {
+  return (
+    <div className={cn("flex flex-col", collapsed ? "gap-1" : "gap-1")}>
+      {showDivider ? (
+        <div
+          className={cn(
+            "my-1 border-t border-sidebar-border/80",
+            collapsed ? "mx-1" : "mx-2",
+          )}
+          role="presentation"
+        />
+      ) : null}
+
+      {!collapsed ? (
+        <p className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/40">
+          {group.label}
+        </p>
+      ) : null}
+
+      <div className={cn("flex flex-col gap-0.5", collapsed && "items-center")}>
+        {group.items.map((item) => (
+          <NavLink
+            key={item.href}
+            item={item}
+            isActive={isNavItemActive(pathname, item.href)}
+            collapsed={collapsed}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -155,13 +247,13 @@ export function Sidebar() {
     <TooltipProvider delay={200}>
       <aside
         className={cn(
-          "flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-in-out",
+          "flex h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-in-out",
           collapsed ? "w-[4.25rem]" : "w-64",
         )}
       >
         <div
           className={cn(
-            "flex h-14 items-center border-b border-sidebar-border",
+            "flex h-14 items-center border-b border-sidebar-border/80 bg-sidebar-accent/30",
             collapsed ? "justify-center px-2" : "px-4",
           )}
         >
@@ -170,26 +262,19 @@ export function Sidebar() {
 
         <nav
           className={cn(
-            "flex flex-1 flex-col gap-1 p-2",
+            "flex flex-1 flex-col overflow-y-auto p-2",
             collapsed && "items-center",
           )}
         >
-          {navItems.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`)
-
-            return (
-              <NavLink
-                key={item.href}
-                item={item}
-                isActive={isActive}
-                collapsed={collapsed}
-              />
-            )
-          })}
+          {navGroups.map((group, index) => (
+            <NavGroupSection
+              key={group.label}
+              group={group}
+              pathname={pathname}
+              collapsed={collapsed}
+              showDivider={index > 0}
+            />
+          ))}
         </nav>
 
         <div
@@ -204,7 +289,10 @@ export function Sidebar() {
                 <Button
                   variant="ghost"
                   size={collapsed ? "icon-sm" : "sm"}
-                  className={cn(!collapsed && "w-full justify-start")}
+                  className={cn(
+                    "rounded-xl text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+                    !collapsed && "w-full justify-start",
+                  )}
                   aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
                   onClick={toggleCollapsed}
                 />

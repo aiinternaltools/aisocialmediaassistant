@@ -1,6 +1,12 @@
 import type { BrandProfileRow } from "@/types/app"
-import type { StrategyContentType } from "@/lib/validations/marketing-campaign"
-import { STRATEGY_CONTENT_TYPES } from "@/lib/validations/marketing-campaign"
+import type {
+  StrategyContentMode,
+  StrategyContentType,
+} from "@/lib/validations/marketing-campaign"
+import {
+  getAllowedContentTypes,
+  STRATEGY_CONTENT_MODE_LABELS,
+} from "@/lib/validations/marketing-campaign"
 
 export type BuildStrategyPromptInput = {
   name: string
@@ -11,6 +17,7 @@ export type BuildStrategyPromptInput = {
   extraInstructions?: string | null
   productNames: string[]
   brandProfile: BrandProfileRow | null
+  contentMode: StrategyContentMode
 }
 
 function buildBrandSummary(brandProfile: BrandProfileRow): string {
@@ -28,14 +35,19 @@ export function buildStrategyPrompt(input: BuildStrategyPromptInput): {
   user: string
   summary: string
 } {
-  const contentTypes = STRATEGY_CONTENT_TYPES.join(", ")
+  const allowedTypes = getAllowedContentTypes(input.contentMode)
+  const contentTypes = allowedTypes.join(", ")
+  const modeLabel = STRATEGY_CONTENT_MODE_LABELS[input.contentMode]
 
   const system = [
     "You are an expert social media marketing strategist.",
     "Create a day-by-day content strategy as valid JSON only — no markdown, no code fences, no extra text.",
+    `Campaign content mode: ${modeLabel}.`,
     `Each step must use content_type from this list: ${contentTypes}.`,
+    input.contentMode === "text_only"
+      ? "Every step must use content_type text_post."
+      : "Mix text_post and image_post across the campaign — include image posts on roughly half the days.",
     "Set completed to false for every step.",
-    "Vary content types across the campaign for a balanced mix.",
     "When products are provided, assign product_reference (exact product name) to relevant steps only.",
   ].join(" ")
 
@@ -43,6 +55,7 @@ export function buildStrategyPrompt(input: BuildStrategyPromptInput): {
     "## Campaign",
     `Name: ${input.name}`,
     `Duration: ${input.durationDays} days`,
+    `Content mode: ${modeLabel}`,
     `Goal: ${input.campaignGoal}`,
     input.targetAudience ? `Target audience: ${input.targetAudience}` : null,
     input.seasonality ? `Seasonality: ${input.seasonality}` : null,
@@ -73,7 +86,7 @@ export function buildStrategyPrompt(input: BuildStrategyPromptInput): {
   return {
     system,
     user: userSections,
-    summary: `marketing strategy for ${input.name} (${input.durationDays} days)`,
+    summary: `marketing strategy for ${input.name} (${input.durationDays} days, ${modeLabel})`,
   }
 }
 

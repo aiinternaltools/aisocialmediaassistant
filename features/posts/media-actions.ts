@@ -379,6 +379,13 @@ export async function generatePostImage(input: {
 
     let productImageBytes: { data: Buffer; mimeType: string } | null = null
 
+    console.log("[post-image] product reference input", {
+      postId: input.postId,
+      productName: input.productContext?.name ?? null,
+      productDescription: input.productContext?.description ?? null,
+      storagePath: input.productImageStoragePath ?? null,
+    })
+
     if (input.productImageStoragePath) {
       try {
         const supabase = await createClient()
@@ -392,10 +399,34 @@ export async function generatePostImage(input: {
             data: Buffer.from(arrayBuffer),
             mimeType: data.type || "image/jpeg",
           }
+          console.log("[post-image] product reference image loaded for Gemini", {
+            postId: input.postId,
+            productName: input.productContext?.name ?? null,
+            storagePath: input.productImageStoragePath,
+            mimeType: productImageBytes.mimeType,
+            byteSize: productImageBytes.data.length,
+          })
+        } else {
+          console.warn("[post-image] product reference image download failed", {
+            postId: input.postId,
+            productName: input.productContext?.name ?? null,
+            storagePath: input.productImageStoragePath,
+            error: error?.message ?? "empty response",
+          })
         }
-      } catch {
-        // Best-effort — continue without product image if download fails
+      } catch (err) {
+        console.warn("[post-image] product reference image download error", {
+          postId: input.postId,
+          productName: input.productContext?.name ?? null,
+          storagePath: input.productImageStoragePath,
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
+    } else {
+      console.log("[post-image] no product reference image path — text-only product context", {
+        postId: input.postId,
+        productName: input.productContext?.name ?? null,
+      })
     }
 
     await removeExistingPostMedia(input.postId)

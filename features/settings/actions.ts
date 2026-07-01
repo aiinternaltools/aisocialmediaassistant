@@ -14,6 +14,7 @@ import {
   type AppSettingsFormValues,
 } from "@/lib/validations/settings"
 import { createClient } from "@/services/supabase/server"
+import { hasEnvOpenAiApiKey } from "@/services/ai/env"
 import type {
   ActionResult,
   PlatformRow,
@@ -32,7 +33,7 @@ const DEFAULT_SETTINGS: Omit<
   date_format: "MM/dd/yyyy",
   default_post_status: "draft",
   default_platform_ids: [],
-  text_ai_provider: "openai",
+  text_ai_provider: "gemini",
   openai_model: "gpt-4o-mini",
   openai_temperature: 0.7,
   openai_max_tokens: 1024,
@@ -103,6 +104,11 @@ export async function updateAiSettings(
 ): Promise<ActionResult<SettingsBundle>> {
   try {
     const parsed = aiSettingsSchema.parse(values)
+    const textAiProvider =
+      parsed.text_ai_provider === "openai" && !hasEnvOpenAiApiKey()
+        ? "gemini"
+        : parsed.text_ai_provider
+
     const workspaceUserId = await getWorkspaceUserId()
     const supabase = await createClient()
     await ensureSettings(workspaceUserId)
@@ -110,7 +116,7 @@ export async function updateAiSettings(
     const { data, error } = await supabase
       .from("settings")
       .update({
-        text_ai_provider: parsed.text_ai_provider,
+        text_ai_provider: textAiProvider,
         openai_model: parsed.openai_model,
         openai_temperature: parsed.openai_temperature,
         openai_max_tokens: parsed.openai_max_tokens,

@@ -82,6 +82,17 @@ export async function generateImage(
     hasProductImage: Boolean(input.productImageBytes),
   })
 
+  console.log("[gemini-image] request payload", {
+    model: IMAGE_GENERATION_MODEL,
+    productName: input.productContext?.name ?? null,
+    productDescription: input.productContext?.description ?? null,
+    hasProductReferenceImage: Boolean(input.productImageBytes),
+    referenceImageMimeType: input.productImageBytes?.mimeType ?? null,
+    referenceImageByteSize: input.productImageBytes?.data.length ?? null,
+    promptIncludesProductImageNote: Boolean(input.productImageBytes),
+    aspectRatio: input.aspectRatio,
+  })
+
   const genAI = getGeminiClient()
   const model = genAI.getGenerativeModel({
     model: IMAGE_GENERATION_MODEL,
@@ -109,6 +120,12 @@ export async function generateImage(
         promptText,
       ]
     : [promptText]
+
+  console.log("[gemini-image] content parts", {
+    productName: input.productContext?.name ?? null,
+    partCount: contentParts.length,
+    includesInlineProductImage: Boolean(input.productImageBytes),
+  })
 
   try {
     const result = await model.generateContent(contentParts as Parameters<typeof model.generateContent>[0])

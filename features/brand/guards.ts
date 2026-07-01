@@ -42,12 +42,10 @@ type CompletenessInput = Pick<
   | "brand_voice"
   | "writing_style"
   | "brand_values"
-  | "products_services"
   | "preferred_ctas"
   | "color_primary"
   | "color_secondary"
   | "color_accent"
-  | "logo_storage_path"
 >
 
 export function computeBrandProfileComplete(
@@ -61,12 +59,10 @@ export function computeBrandProfileComplete(
     profile.brand_voice.length > 0 &&
     profile.writing_style.length > 0 &&
     profile.brand_values.length > 0 &&
-    profile.products_services.length > 0 &&
     profile.preferred_ctas.length > 0 &&
     Boolean(profile.color_primary) &&
     Boolean(profile.color_secondary) &&
-    Boolean(profile.color_accent) &&
-    Boolean(profile.logo_storage_path)
+    Boolean(profile.color_accent)
   )
 }
 

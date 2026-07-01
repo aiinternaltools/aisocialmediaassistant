@@ -1,12 +1,26 @@
 import { z } from "zod"
 
+export const STRATEGY_CONTENT_MODES = ["text_only", "text_and_image"] as const
+
+export type StrategyContentMode = (typeof STRATEGY_CONTENT_MODES)[number]
+
+export const STRATEGY_CONTENT_MODE_LABELS: Record<StrategyContentMode, string> = {
+  text_only: "Text only",
+  text_and_image: "Text + image",
+}
+
+export const STRATEGY_ACTIVE_CONTENT_TYPES = ["text_post", "image_post"] as const
+
+export type StrategyActiveContentType =
+  (typeof STRATEGY_ACTIVE_CONTENT_TYPES)[number]
+
+/** Legacy content types kept for existing strategies. New AI strategies use text_post / image_post only. */
 export const STRATEGY_CONTENT_TYPES = [
-  "image_post",
+  ...STRATEGY_ACTIVE_CONTENT_TYPES,
   "carousel",
   "reel",
   "story",
   "video",
-  "text_post",
   "thread",
   "poll",
 ] as const
@@ -14,14 +28,31 @@ export const STRATEGY_CONTENT_TYPES = [
 export type StrategyContentType = (typeof STRATEGY_CONTENT_TYPES)[number]
 
 export const STRATEGY_CONTENT_TYPE_LABELS: Record<StrategyContentType, string> = {
+  text_post: "Text Post",
   image_post: "Image Post",
   carousel: "Carousel",
   reel: "Reel",
   story: "Story",
   video: "Video",
-  text_post: "Text Post",
   thread: "Thread",
   poll: "Poll",
+}
+
+export function getAllowedContentTypes(
+  mode: StrategyContentMode,
+): StrategyActiveContentType[] {
+  return mode === "text_only" ? ["text_post"] : ["text_post", "image_post"]
+}
+
+export function inferContentModeFromSteps(steps: StrategyStep[]): StrategyContentMode {
+  if (
+    steps.length > 0 &&
+    steps.every((step) => step.content_type === "text_post")
+  ) {
+    return "text_only"
+  }
+
+  return "text_and_image"
 }
 
 export const strategyStepSchema = z.object({
@@ -78,6 +109,7 @@ export function parseStrategySteps(raw: unknown): StrategyStep[] {
 export function validateGeneratedStrategy(
   steps: StrategyStep[],
   durationDays: number,
+  contentMode: StrategyContentMode = "text_and_image",
 ): { valid: true; steps: StrategyStep[] } | { valid: false; error: string } {
   if (steps.length !== durationDays) {
     return {
@@ -96,10 +128,40 @@ export function validateGeneratedStrategy(
     }
   }
 
+  const allowedTypes = getAllowedContentTypes(contentMode)
+  for (const step of steps) {
+    if (!allowedTypes.includes(step.content_type as StrategyActiveContentType)) {
+      return {
+        valid: false,
+        error: `Invalid content type "${step.content_type}" for ${STRATEGY_CONTENT_MODE_LABELS[contentMode]} mode.`,
+      }
+    }
+  }
+
   const normalized = steps
     .slice()
     .sort((a, b) => a.day - b.day)
     .map((step) => ({ ...step, completed: false }))
 
   return { valid: true, steps: normalized }
+}
+
+export const strategyStepEditSchema = z.object({
+  content_type: z.enum(STRATEGY_ACTIVE_CONTENT_TYPES),
+  topic: z.string().min(1, "Topic is required").max(500),
+  objective: z.string().min(1, "Objective is required").max(500),
+  product_reference: z.string().max(200).optional().nullable(),
+  notes: z.string().max(1000).optional().nullable(),
+})
+
+export type StrategyStepEditValues = z.infer<typeof strategyStepEditSchema>
+
+export function parseStrategyContentMode(
+  value: string | null | undefined,
+): StrategyContentMode {
+  if (value === "text_only" || value === "text_and_image") {
+    return value
+  }
+
+  return "text_and_image"
 }

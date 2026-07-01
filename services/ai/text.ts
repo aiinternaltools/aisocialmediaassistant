@@ -7,7 +7,7 @@ import type { Enums } from "@/types/database"
 type TextProvider = Enums<"ai_provider">
 
 export function resolveTextProvider(settings: SettingsBundle): TextProvider {
-  return settings.text_ai_provider ?? "openai"
+  return settings.text_ai_provider ?? "gemini"
 }
 
 function getProviderModule(settings: SettingsBundle) {

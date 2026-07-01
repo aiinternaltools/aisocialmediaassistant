@@ -1,9 +1,9 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ImagePlus, Plus, Trash2, Upload, X } from "lucide-react"
-import { useRef, useState, useTransition } from "react"
-import { Controller, useFieldArray, useForm } from "react-hook-form"
+import { Globe, Loader2, Sparkles, X } from "lucide-react"
+import { useState, useTransition } from "react"
+import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -18,22 +18,9 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
+import { upsertBrandProfile, extractBrandFromUrl } from "@/features/brand/actions"
 import {
-  upsertBrandProfile,
-  uploadBrandAsset,
-  uploadLogo,
-} from "@/features/brand/actions"
-import {
-  BRAND_ASSET_TYPES,
   BRAND_VALUES_OPTIONS,
   BRAND_VOICE_OPTIONS,
   CTA_OPTIONS,
@@ -43,14 +30,22 @@ import { computeBrandProfileComplete } from "@/features/brand/guards"
 import { getBrandProfileDefaultValues } from "@/features/brand/lib/mappers"
 import {
   brandProfileFormSchema,
+  extractBrandFromUrlSchema,
   type BrandProfileFormValues,
+  type ExtractBrandFromUrlValues,
 } from "@/lib/validations/brand-profile"
-import type { BrandAssetRow, BrandProfileWithAssets } from "@/types/app"
+import type { BrandProfileRow } from "@/types/app"
 import { cn } from "@/lib/utils"
 
 interface BrandProfileFormProps {
   userId: string
-  initialProfile: BrandProfileWithAssets | null
+  initialProfile: BrandProfileRow | null
+}
+
+type EntryMode = "url" | "manual"
+
+function hasExistingBrandData(profile: BrandProfileRow | null): boolean {
+  return Boolean(profile?.brand_name?.trim())
 }
 
 interface MultiSelectChipsProps<T extends string> {
@@ -233,134 +228,198 @@ export function BrandProfileForm({
   userId,
   initialProfile,
 }: BrandProfileFormProps) {
-  const logoInputRef = useRef<HTMLInputElement>(null)
-  const assetInputRef = useRef<HTMLInputElement>(null)
+  const hasExistingProfile = hasExistingBrandData(initialProfile)
+  const [entryMode, setEntryMode] = useState<EntryMode>(
+    hasExistingProfile ? "manual" : "url",
+  )
+  const [showForm, setShowForm] = useState(hasExistingProfile)
+  const [profileId, setProfileId] = useState<string | undefined>(
+    initialProfile?.id,
+  )
   const [isPending, startTransition] = useTransition()
-  const [isUploadingLogo, startLogoUpload] = useTransition()
-  const [isUploadingAsset, startAssetUpload] = useTransition()
-  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(
-    initialProfile?.logoUrl ?? null,
-  )
-  const [assets, setAssets] = useState<BrandAssetRow[]>(
-    initialProfile?.assets ?? [],
-  )
-  const [assetType, setAssetType] = useState<string>("guidelines")
+  const [isExtracting, startExtractTransition] = useTransition()
+
+  const defaultValues = getBrandProfileDefaultValues(userId, initialProfile)
 
   const {
     register,
     control,
     handleSubmit,
     watch,
-    setValue,
+    reset,
     formState: { errors },
   } = useForm<BrandProfileFormValues>({
     resolver: zodResolver(brandProfileFormSchema),
-    defaultValues: getBrandProfileDefaultValues(userId, initialProfile),
+    defaultValues,
   })
 
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "products_services",
+  const urlForm = useForm<ExtractBrandFromUrlValues>({
+    resolver: zodResolver(extractBrandFromUrlSchema),
+    defaultValues: { url: "" },
   })
 
-  const profileId = watch("id")
   const watchedValues = watch()
   const isComplete = computeBrandProfileComplete(watchedValues)
 
-  const onSubmit = handleSubmit((values) => {
-    startTransition(async () => {
-      const result = await upsertBrandProfile(values)
+  function handleExtract(values: ExtractBrandFromUrlValues) {
+    startExtractTransition(async () => {
+      const result = await extractBrandFromUrl(values.url)
 
       if (!result.success) {
         toast.error(result.error)
         return
       }
 
-      setValue("id", result.data.id)
-      setLogoPreviewUrl(result.data.logoUrl)
-      setAssets(result.data.assets)
-      toast.success(
-        result.data.is_complete
-          ? "Brand profile saved and complete."
-          : "Brand profile saved. Complete all fields for the best AI results.",
-      )
-    })
-  })
-
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) {
-      return
-    }
-
-    startLogoUpload(async () => {
-      const formData = new FormData()
-      formData.append("file", file)
-
-      const result = await uploadLogo(formData)
-
-      if (!result.success) {
-        toast.error(result.error)
-        return
-      }
-
-      setValue("logo_storage_path", result.data.storagePath, {
-        shouldValidate: true,
+      reset({
+        ...defaultValues,
+        ...result.data,
       })
-      setLogoPreviewUrl(result.data.signedUrl)
-
-      if (result.data.profileId) {
-        setValue("id", result.data.profileId)
-      }
-
-      toast.success("Logo uploaded.")
+      setShowForm(true)
+      toast.success("Brand profile imported. Review the fields and save.")
     })
-
-    event.target.value = ""
   }
 
-  const handleAssetUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    const currentProfileId = profileId ?? initialProfile?.id
+  const onSubmit = handleSubmit(
+    (values) => {
+      startTransition(async () => {
+        const result = await upsertBrandProfile({
+          ...values,
+          id: profileId,
+        })
 
-    if (!file) {
-      return
-    }
+        if (!result.success) {
+          toast.error(result.error)
+          return
+        }
 
-    if (!currentProfileId) {
-      toast.error("Save your brand profile before uploading assets.")
-      return
-    }
-
-    startAssetUpload(async () => {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("brand_profile_id", currentProfileId)
-      formData.append("asset_type", assetType)
-
-      const result = await uploadBrandAsset(formData)
-
-      if (!result.success) {
-        toast.error(result.error)
-        return
-      }
-
-      setAssets((current) => [result.data, ...current])
-      toast.success("Brand asset uploaded.")
-    })
-
-    event.target.value = ""
-  }
+        setProfileId(result.data.id)
+        toast.success(
+          result.data.is_complete
+            ? "Brand profile saved and complete."
+            : "Brand profile saved. Complete all fields for the best AI results.",
+        )
+      })
+    },
+    () => {
+      toast.error("Please complete the highlighted fields before saving.")
+    },
+  )
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      <input type="hidden" {...register("id")} />
-      {!isComplete ? (
+    <div className="space-y-6">
+      <div className="flex rounded-lg border bg-muted p-1 gap-1">
+        <button
+          type="button"
+          onClick={() => setEntryMode("url")}
+          className={cn(
+            "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            entryMode === "url"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Import from website
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setEntryMode("manual")
+            setShowForm(true)
+          }}
+          className={cn(
+            "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            entryMode === "manual"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Fill manually
+        </button>
+      </div>
+
+      {entryMode === "url" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {showForm ? "Re-import from website" : "Import from website"}
+            </CardTitle>
+            <CardDescription>
+              Paste your business website URL. AI will read the page and fill
+              in your brand profile fields for you to review.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              onSubmit={urlForm.handleSubmit(handleExtract)}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="brand-url">Website URL</Label>
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="brand-url"
+                    placeholder="https://yourbusiness.com"
+                    className="pl-9"
+                    disabled={isExtracting}
+                    {...urlForm.register("url")}
+                  />
+                </div>
+                {urlForm.formState.errors.url ? (
+                  <p className="text-sm text-destructive">
+                    {urlForm.formState.errors.url.message}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={isExtracting}>
+                  {isExtracting ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Fetching and analysing…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 size-4" />
+                      {showForm ? "Re-import with AI" : "Extract with AI"}
+                    </>
+                  )}
+                </Button>
+                {!showForm ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isExtracting}
+                    onClick={() => {
+                      setEntryMode("manual")
+                      setShowForm(true)
+                    }}
+                  >
+                    Fill manually instead
+                  </Button>
+                ) : null}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {showForm || entryMode === "manual" ? (
+        <form onSubmit={onSubmit} className="space-y-6">
+          {entryMode === "url" && showForm ? (
+            <Alert>
+              <AlertDescription>
+                Imported from website. Review every field before saving — you
+                can still edit anything manually.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {!isComplete ? (
         <Alert>
           <AlertDescription>
-            Complete all required fields and upload a logo to enable AI
-            features. AI generation stays disabled until your profile is
-            complete.
+            Complete all required fields to enable AI features. AI generation
+            stays disabled until your profile is complete.
           </AlertDescription>
         </Alert>
       ) : (
@@ -410,7 +469,7 @@ export function BrandProfileForm({
             ) : null}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 md:col-span-2">
             <Label htmlFor="industry">Industry</Label>
             <Input
               id="industry"
@@ -423,45 +482,6 @@ export function BrandProfileForm({
                 {errors.industry.message}
               </p>
             ) : null}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="website">Website</Label>
-            <Input
-              id="website"
-              type="url"
-              placeholder="https://example.com"
-              disabled={isPending}
-              {...register("website")}
-            />
-            {errors.website ? (
-              <p className="text-sm text-destructive">
-                {errors.website.message}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              disabled={isPending}
-              {...register("email")}
-            />
-            {errors.email ? (
-              <p className="text-sm text-destructive">{errors.email.message}</p>
-            ) : null}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" disabled={isPending} {...register("phone")} />
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="address">Address</Label>
-            <Input id="address" disabled={isPending} {...register("address")} />
           </div>
         </CardContent>
       </Card>
@@ -552,82 +572,6 @@ export function BrandProfileForm({
               </p>
             ) : null}
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Products & Services</CardTitle>
-          <CardDescription>
-            List what you offer so AI can reference it accurately.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {fields.map((field, index) => (
-            <div
-              key={field.id}
-              className="grid gap-3 rounded-lg border p-4 md:grid-cols-[1fr_1fr_auto]"
-            >
-              <div className="space-y-2">
-                <Label htmlFor={`product-name-${index}`}>Name</Label>
-                <Input
-                  id={`product-name-${index}`}
-                  disabled={isPending}
-                  {...register(`products_services.${index}.name`)}
-                />
-                {errors.products_services?.[index]?.name ? (
-                  <p className="text-sm text-destructive">
-                    {errors.products_services[index]?.name?.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor={`product-description-${index}`}>
-                  Description
-                </Label>
-                <Input
-                  id={`product-description-${index}`}
-                  disabled={isPending}
-                  {...register(`products_services.${index}.description`)}
-                />
-              </div>
-
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  disabled={isPending || fields.length === 1}
-                  onClick={() => remove(index)}
-                  aria-label="Remove product or service"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-
-          {errors.products_services?.root ? (
-            <p className="text-sm text-destructive">
-              {errors.products_services.root.message}
-            </p>
-          ) : null}
-          {typeof errors.products_services?.message === "string" ? (
-            <p className="text-sm text-destructive">
-              {errors.products_services.message}
-            </p>
-          ) : null}
-
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isPending}
-            onClick={() => append({ name: "", description: "" })}
-          >
-            <Plus className="size-4" />
-            Add product or service
-          </Button>
         </CardContent>
       </Card>
 
@@ -754,141 +698,13 @@ export function BrandProfileForm({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Logo</CardTitle>
-          <CardDescription>
-            Upload your logo. Required to complete your brand profile.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="flex size-24 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-              {logoPreviewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={logoPreviewUrl}
-                  alt="Brand logo preview"
-                  className="size-full object-contain"
-                />
-              ) : (
-                <ImagePlus className="size-8 text-muted-foreground" />
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <input
-                ref={logoInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                className="hidden"
-                onChange={handleLogoUpload}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isPending || isUploadingLogo}
-                onClick={() => logoInputRef.current?.click()}
-              >
-                <Upload className="size-4" />
-                {isUploadingLogo ? "Uploading..." : "Upload logo"}
-              </Button>
-              <p className="text-sm text-muted-foreground">
-                PNG, JPG, WebP, or SVG up to 10 MB.
-              </p>
-            </div>
-          </div>
-
-          {errors.logo_storage_path ? (
-            <p className="text-sm text-destructive">
-              {errors.logo_storage_path.message}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Brand Assets</CardTitle>
-          <CardDescription>
-            Optional guidelines, fonts, or reference images.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {assets.length > 0 ? (
-            <ul className="space-y-2">
-              {assets.map((asset) => (
-                <li
-                  key={asset.id}
-                  className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
-                >
-                  <div>
-                    <p className="font-medium">{asset.file_name}</p>
-                    <p className="text-muted-foreground capitalize">
-                      {asset.asset_type}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No brand assets uploaded yet.
-            </p>
-          )}
-
-          <Separator />
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="space-y-2 sm:w-56">
-              <Label>Asset type</Label>
-              <Select
-                value={assetType}
-                onValueChange={(value) => {
-                  if (value) {
-                    setAssetType(value)
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {BRAND_ASSET_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <input
-                ref={assetInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleAssetUpload}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isPending || isUploadingAsset}
-                onClick={() => assetInputRef.current?.click()}
-              >
-                <Upload className="size-4" />
-                {isUploadingAsset ? "Uploading..." : "Upload asset"}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="flex justify-end">
         <Button type="submit" disabled={isPending}>
           {isPending ? "Saving..." : "Save brand profile"}
         </Button>
       </div>
-    </form>
+        </form>
+      ) : null}
+    </div>
   )
 }

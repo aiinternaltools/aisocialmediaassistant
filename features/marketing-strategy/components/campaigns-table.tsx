@@ -151,6 +151,8 @@ function ActionsMenu({ campaign }: { campaign: MarketingCampaignWithProgress }) 
 }
 
 export function CampaignsTable({ campaigns }: CampaignsTableProps) {
+  const router = useRouter()
+
   if (campaigns.length === 0) {
     return (
       <EmptyState
@@ -175,15 +177,14 @@ export function CampaignsTable({ campaigns }: CampaignsTableProps) {
         </TableHeader>
         <TableBody>
           {campaigns.map((campaign) => (
-            <TableRow key={campaign.id}>
-              <TableCell>
-                <Link
-                  href={`/marketing-strategy/${campaign.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {campaign.name}
-                </Link>
-              </TableCell>
+            <TableRow
+              key={campaign.id}
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() =>
+                router.push(`/marketing-strategy/${campaign.id}`)
+              }
+            >
+              <TableCell className="font-medium">{campaign.name}</TableCell>
               <TableCell>{campaign.duration_days} days</TableCell>
               <TableCell>
                 <ProgressCell campaign={campaign} />
@@ -198,7 +199,7 @@ export function CampaignsTable({ campaigns }: CampaignsTableProps) {
                   <span className="text-sm text-muted-foreground">—</span>
                 )}
               </TableCell>
-              <TableCell>
+              <TableCell onClick={(event) => event.stopPropagation()}>
                 <ActionsMenu campaign={campaign} />
               </TableCell>
             </TableRow>

@@ -35,7 +35,6 @@ import {
 import { deleteProduct, type ProductRow } from "@/features/products/actions"
 import { ProductForm } from "@/features/products/components/product-form"
 import { PRODUCT_TYPE_LABELS } from "@/lib/validations/product"
-import { createSignedUrl } from "@/services/storage/upload"
 
 interface ProductsTableProps {
   products: ProductRow[]
@@ -70,14 +69,14 @@ function ProductThumbnail({
 
   if (!imageUrl || failed) {
     return (
-      <div className="flex size-12 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
-        <ImageOff className="size-5" />
+      <div className="flex size-16 shrink-0 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+        <ImageOff className="size-6" />
       </div>
     )
   }
 
   return (
-    <div className="relative size-12 shrink-0 overflow-hidden rounded-md border bg-muted">
+    <div className="relative size-16 shrink-0 overflow-hidden rounded-md border bg-muted">
       <Image
         src={imageUrl}
         alt={name}
@@ -92,13 +91,14 @@ function ProductThumbnail({
 
 function ActionsMenu({
   product,
+  onEdit,
   onDeleted,
 }: {
   product: ProductRow
+  onEdit: () => void
   onDeleted: () => void
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
   const [isDeleting, startDeleteTransition] = useTransition()
 
   function handleDelete() {
@@ -123,7 +123,7 @@ function ActionsMenu({
           <MoreHorizontal className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditOpen(true)}>
+          <DropdownMenuItem onClick={onEdit}>
             <Pencil className="mr-2 size-4" />
             Edit
           </DropdownMenuItem>
@@ -138,12 +138,6 @@ function ActionsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ProductForm
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        product={product}
-      />
-
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -153,6 +147,58 @@ function ActionsMenu({
         variant="destructive"
         loading={isDeleting}
         onConfirm={handleDelete}
+      />
+    </>
+  )
+}
+
+function ProductTableRow({
+  product,
+  imageUrl,
+  onDeleted,
+}: {
+  product: ProductRow
+  imageUrl?: string
+  onDeleted: () => void
+}) {
+  const [editOpen, setEditOpen] = useState(false)
+
+  return (
+    <>
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={() => setEditOpen(true)}
+      >
+        <TableCell>
+          <ProductThumbnail imageUrl={imageUrl} name={product.name} />
+        </TableCell>
+        <TableCell className="font-medium">{product.name}</TableCell>
+        <TableCell>
+          <ProductTypeBadge type={product.type} />
+        </TableCell>
+        <TableCell className="hidden max-w-sm md:table-cell">
+          {product.description ? (
+            <span className="line-clamp-2 text-sm text-muted-foreground">
+              {product.description}
+            </span>
+          ) : (
+            <span className="text-sm text-muted-foreground/50">—</span>
+          )}
+        </TableCell>
+        <TableCell onClick={(event) => event.stopPropagation()}>
+          <ActionsMenu
+            product={product}
+            onEdit={() => setEditOpen(true)}
+            onDeleted={onDeleted}
+          />
+        </TableCell>
+      </TableRow>
+
+      <ProductForm
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        product={product}
+        initialImageUrl={imageUrl}
       />
     </>
   )
@@ -176,7 +222,7 @@ export function ProductsTable({ products, imageUrls }: ProductsTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-16">Image</TableHead>
+            <TableHead className="w-20">Image</TableHead>
             <TableHead>Name</TableHead>
             <TableHead className="w-28">Type</TableHead>
             <TableHead className="hidden md:table-cell">Description</TableHead>
@@ -185,33 +231,12 @@ export function ProductsTable({ products, imageUrls }: ProductsTableProps) {
         </TableHeader>
         <TableBody>
           {products.map((product) => (
-            <TableRow key={product.id}>
-              <TableCell>
-                <ProductThumbnail
-                  imageUrl={imageUrls[product.id]}
-                  name={product.name}
-                />
-              </TableCell>
-              <TableCell className="font-medium">{product.name}</TableCell>
-              <TableCell>
-                <ProductTypeBadge type={product.type} />
-              </TableCell>
-              <TableCell className="hidden max-w-sm md:table-cell">
-                {product.description ? (
-                  <span className="line-clamp-2 text-sm text-muted-foreground">
-                    {product.description}
-                  </span>
-                ) : (
-                  <span className="text-sm text-muted-foreground/50">—</span>
-                )}
-              </TableCell>
-              <TableCell>
-                <ActionsMenu
-                  product={product}
-                  onDeleted={() => router.refresh()}
-                />
-              </TableCell>
-            </TableRow>
+            <ProductTableRow
+              key={product.id}
+              product={product}
+              imageUrl={imageUrls[product.id]}
+              onDeleted={() => router.refresh()}
+            />
           ))}
         </TableBody>
       </Table>

@@ -5,6 +5,7 @@ import {
   parseStrategySteps,
   strategyResponseSchema,
   validateGeneratedStrategy,
+  type StrategyContentMode,
   type StrategyStep,
 } from "@/lib/validations/marketing-campaign"
 import { getGeminiClient } from "@/services/ai/gemini-client"
@@ -167,7 +168,11 @@ export async function generateMarketingStrategy(
     try {
       const { raw, tokensUsed, promptSummary } = await callProviderOnce(input)
       const steps = parseStrategyJson(raw)
-      const validation = validateGeneratedStrategy(steps, input.durationDays)
+      const validation = validateGeneratedStrategy(
+        steps,
+        input.durationDays,
+        input.contentMode,
+      )
 
       if (!validation.valid) {
         throw new AppError({

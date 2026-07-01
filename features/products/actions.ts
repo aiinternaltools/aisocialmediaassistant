@@ -451,6 +451,12 @@ export async function uploadProductImage(
       return { success: false, error: "No file provided." }
     }
 
+    const replacePath = formData.get("replace_storage_path")
+    const pendingReplacePath =
+      typeof replacePath === "string" && replacePath.startsWith(`${userId}/`)
+        ? replacePath
+        : null
+
     const rawBuffer = Buffer.from(await file.arrayBuffer())
     const jpegBuffer = await sharp(rawBuffer).jpeg({ quality: 90 }).toBuffer()
 
@@ -467,6 +473,10 @@ export async function uploadProductImage(
         message: uploadError.message,
         userMessage: "Image upload failed. Please try again.",
       })
+    }
+
+    if (pendingReplacePath && pendingReplacePath !== storagePath) {
+      await removeStoredProductImage(pendingReplacePath)
     }
 
     const { data: signData } = await adminClient.storage
@@ -570,20 +580,95 @@ export async function getProducts(): Promise<ActionResult<ProductRow[]>> {
   }
 }
 
+async function removeStoredProductImage(storagePath: string): Promise<void> {
+  if (!storagePath) return
+
+  try {
+    const adminClient = createAdminClient()
+    const { error } = await adminClient.storage
+      .from("product-images")
+      .remove([storagePath])
+
+    if (error) {
+      console.warn("[product] Failed to delete stored image:", storagePath, error.message)
+    }
+  } catch (err) {
+    console.warn("[product] Failed to delete stored image:", storagePath, err)
+  }
+}
+
+export type UpdateProductInput = Partial<ProductFormValues> & {
+  pre_uploaded_storage_path?: string | null
+  remove_image?: boolean
+}
+
 export async function updateProduct(
   id: string,
-  values: Partial<ProductFormValues>,
+  values: UpdateProductInput,
 ): Promise<ActionResult> {
   try {
     const userId = await getAuthUserId()
     const supabase = await createClient()
 
+    const { pre_uploaded_storage_path, remove_image, ...formValues } = values
+    const parsed = productFormSchema.partial().safeParse(formValues)
+
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Validation error" }
+    }
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("products")
+      .select("image_storage_path")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .single()
+
+    if (fetchError || !existing) {
+      return { success: false, error: "Product not found." }
+    }
+
+    const updatePayload: {
+      type?: ProductType
+      name?: string
+      description?: string | null
+      source_url?: string | null
+      image_storage_path?: string | null
+      metadata?: Record<string, never>
+      updated_at: string
+    } = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (parsed.data.type !== undefined) updatePayload.type = parsed.data.type
+    if (parsed.data.name !== undefined) updatePayload.name = parsed.data.name
+    if (parsed.data.description !== undefined) {
+      updatePayload.description = parsed.data.description ?? null
+    }
+    if (parsed.data.source_url !== undefined) {
+      updatePayload.source_url = parsed.data.source_url || null
+    }
+
+    if (pre_uploaded_storage_path) {
+      if (
+        existing.image_storage_path &&
+        existing.image_storage_path !== pre_uploaded_storage_path
+      ) {
+        await removeStoredProductImage(existing.image_storage_path)
+      }
+      updatePayload.image_storage_path = pre_uploaded_storage_path
+      updatePayload.metadata = {}
+    } else if (remove_image) {
+      if (existing.image_storage_path) {
+        await removeStoredProductImage(existing.image_storage_path)
+      }
+      updatePayload.image_storage_path = null
+      updatePayload.metadata = {}
+    }
+
     const { error } = await supabase
       .from("products")
-      .update({
-        ...values,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", id)
       .eq("user_id", userId)
 
@@ -629,14 +714,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
     }
 
     if (product?.image_storage_path) {
-      try {
-        const adminClient = createAdminClient()
-        await adminClient.storage
-          .from("product-images")
-          .remove([product.image_storage_path])
-      } catch {
-        // Best-effort cleanup
-      }
+      await removeStoredProductImage(product.image_storage_path)
     }
 
     revalidatePath(PRODUCTS_PATH)

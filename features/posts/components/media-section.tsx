@@ -147,6 +147,11 @@ export function MediaSection({
     }
 
     setIsGenerating(true)
+    console.log("[post-image] client: generating with product context", {
+      postId,
+      productName: productContext?.name ?? null,
+      productImageStoragePath: productContext?.imageStoragePath ?? null,
+    })
     const result = await generatePostImage({
       postId,
       prompt: trimmedPrompt,

@@ -177,6 +177,7 @@ export type Database = {
           product_ids: string[];
           seasonality: string | null;
           strategy: Json;
+          strategy_content_mode: string;
           target_audience: string | null;
           updated_at: string;
           user_id: string;
@@ -192,6 +193,7 @@ export type Database = {
           product_ids?: string[];
           seasonality?: string | null;
           strategy?: Json;
+          strategy_content_mode?: string;
           target_audience?: string | null;
           updated_at?: string;
           user_id: string;
@@ -207,6 +209,7 @@ export type Database = {
           product_ids?: string[];
           seasonality?: string | null;
           strategy?: Json;
+          strategy_content_mode?: string;
           target_audience?: string | null;
           updated_at?: string;
           user_id?: string;

@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useTransition, useState, useRef } from "react"
+import { useTransition, useState, useRef, useEffect } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
@@ -56,12 +56,20 @@ interface ProductFormProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   product?: ProductRow
+  /** Signed URL for the product's stored image (edit mode). */
+  initialImageUrl?: string | null
 }
 
 type EntryMode = "url" | "manual"
 type FormStep = "input" | "preview"
 
-export function ProductForm({ trigger, open, onOpenChange, product }: ProductFormProps) {
+export function ProductForm({
+  trigger,
+  open,
+  onOpenChange,
+  product,
+  initialImageUrl,
+}: ProductFormProps) {
   const router = useRouter()
   const isEditMode = Boolean(product)
 
@@ -72,10 +80,11 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
   const [entryMode, setEntryMode] = useState<EntryMode>("url")
   const [step, setStep] = useState<FormStep>(isEditMode ? "preview" : "input")
 
-  // Image state: URL (from extraction) or uploaded storage path
-  const [extractedImageUrl, setExtractedImageUrl] = useState<string | null>(getInitialImageUrl(product))
+  // Image state: extracted URL (create flow only) or uploaded storage path
+  const [extractedImageUrl, setExtractedImageUrl] = useState<string | null>(null)
   const [uploadedStoragePath, setUploadedStoragePath] = useState<string | null>(null)
   const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null)
+  const [imageRemoved, setImageRemoved] = useState(false)
 
   const [sourceUrl, setSourceUrl] = useState<string>(product?.source_url ?? "")
   const [internalOpen, setInternalOpen] = useState(false)
@@ -89,6 +98,23 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
     else setInternalOpen(val)
     if (!val) resetAll()
   }
+
+  useEffect(() => {
+    if (!isOpen || !isEditMode || !product) return
+
+    setExtractedImageUrl(null)
+    setUploadedStoragePath(null)
+    setUploadedPreviewUrl(null)
+    setImageRemoved(false)
+    previewForm.reset({
+      type: product.type,
+      name: product.name,
+      description: product.description ?? "",
+      source_url: product.source_url ?? "",
+    })
+    // previewForm.reset is stable enough; product + initialImageUrl drive re-sync on open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isEditMode, product?.id, initialImageUrl])
 
   const urlForm = useForm<ExtractProductValues>({
     resolver: zodResolver(extractProductSchema),
@@ -108,9 +134,10 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
   function resetAll() {
     setStep(isEditMode ? "preview" : "input")
     setEntryMode("url")
-    setExtractedImageUrl(getInitialImageUrl(product))
+    setExtractedImageUrl(null)
     setUploadedStoragePath(null)
     setUploadedPreviewUrl(null)
+    setImageRemoved(false)
     setSourceUrl(product?.source_url ?? "")
     urlForm.reset()
     previewForm.reset({
@@ -153,6 +180,9 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
     startUploadTransition(async () => {
       const formData = new FormData()
       formData.set("file", file)
+      if (uploadedStoragePath) {
+        formData.set("replace_storage_path", uploadedStoragePath)
+      }
       const result = await uploadProductImage(formData)
 
       if (!result.success) {
@@ -162,8 +192,8 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
 
       setUploadedStoragePath(result.data.storagePath)
       setUploadedPreviewUrl(result.data.previewUrl)
-      // Clear any previously extracted URL
       setExtractedImageUrl(null)
+      setImageRemoved(false)
     })
   }
 
@@ -172,10 +202,23 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
     setUploadedPreviewUrl(null)
   }
 
+  function removeImage() {
+    if (uploadedStoragePath || uploadedPreviewUrl) {
+      removeUploadedImage()
+      return
+    }
+    setExtractedImageUrl(null)
+    setImageRemoved(true)
+  }
+
   function handleSave(values: ProductFormValues) {
     startSaveTransition(async () => {
       const result = isEditMode && product
-        ? await updateProduct(product.id, values)
+        ? await updateProduct(product.id, {
+            ...values,
+            pre_uploaded_storage_path: uploadedStoragePath,
+            remove_image: imageRemoved && !uploadedStoragePath,
+          })
         : await createProduct({
             ...values,
             source_url: sourceUrl,
@@ -194,8 +237,11 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
     })
   }
 
-  // Active preview image: prefer manually uploaded, fall back to extracted URL
-  const previewImage = uploadedPreviewUrl ?? extractedImageUrl
+  const previewImage =
+    uploadedPreviewUrl ??
+    (imageRemoved
+      ? null
+      : (extractedImageUrl ?? initialImageUrl ?? getFallbackImageUrl(product)))
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
@@ -211,7 +257,7 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
         </span>
       )}
 
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-[560px]">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-[720px]">
         <DialogHeader className="shrink-0">
           <DialogTitle>
             {isEditMode ? "Edit Product or Service" : "Add Product or Service"}
@@ -341,13 +387,13 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
                 )}
               </div>
 
-              <div className={previewImage ? "grid grid-cols-[1fr_140px] gap-3 items-start" : "space-y-2"}>
+              <div className={previewImage ? "grid grid-cols-[1fr_220px] gap-4 items-start" : "space-y-2"}>
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
                     placeholder="Describe the product or service…"
-                    className="h-36 resize-none overflow-y-auto"
+                    className="h-44 resize-none overflow-y-auto"
                     {...previewForm.register("description")}
                   />
                   {previewForm.formState.errors.description && (
@@ -356,18 +402,35 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
                 </div>
 
                 {/* Image column */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Image</Label>
+                <div className="space-y-2">
+                  <Label className="text-sm">Image</Label>
                   {previewImage ? (
-                    <div className="relative">
-                      <ImagePreview imageUrl={previewImage} />
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <ImagePreview key={previewImage} imageUrl={previewImage} />
+                        <button
+                          type="button"
+                          onClick={removeImage}
+                          className="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground shadow"
+                          aria-label="Remove image"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        onClick={removeUploadedImage}
-                        className="absolute -right-1.5 -top-1.5 rounded-full bg-destructive p-0.5 text-destructive-foreground shadow"
-                        aria-label="Remove image"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingImage}
+                        className="flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
                       >
-                        <X className="size-3" />
+                        {isUploadingImage ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Upload className="size-4" />
+                            Replace
+                          </>
+                        )}
                       </button>
                     </div>
                   ) : (
@@ -375,14 +438,14 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploadingImage}
-                      className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed bg-muted text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+                      className="flex aspect-square w-full min-h-[220px] flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed bg-muted text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
                     >
                       {isUploadingImage ? (
-                        <Loader2 className="size-5 animate-spin" />
+                        <Loader2 className="size-6 animate-spin" />
                       ) : (
                         <>
-                          <ImagePlus className="size-5" />
-                          <span className="text-xs">Upload</span>
+                          <ImagePlus className="size-7" />
+                          <span className="text-sm">Upload</span>
                         </>
                       )}
                     </button>
@@ -392,9 +455,9 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploadingImage}
-                      className="flex w-full items-center justify-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
                     >
-                      <Upload className="size-3" />
+                      <Upload className="size-4" />
                       Browse
                     </button>
                   )}
@@ -446,7 +509,7 @@ export function ProductForm({ trigger, open, onOpenChange, product }: ProductFor
   )
 }
 
-function getInitialImageUrl(product: ProductRow | undefined): string | null {
+function getFallbackImageUrl(product: ProductRow | undefined): string | null {
   if (!product) return null
   const meta = product.metadata as Record<string, unknown> | null
   return typeof meta?.original_image_url === "string" ? meta.original_image_url : null

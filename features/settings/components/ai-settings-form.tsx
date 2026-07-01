@@ -1,10 +1,11 @@
 "use client"
 
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useTransition } from "react"
+import { useEffect, useTransition } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -37,12 +38,17 @@ import {
   TEXT_AI_PROVIDER_OPTIONS,
   type AiSettingsFormValues,
 } from "@/lib/validations/settings"
+import { cn } from "@/lib/utils"
 
 interface AiSettingsFormProps {
   defaultValues: AiSettingsFormValues
+  openAiAvailable: boolean
 }
 
-export function AiSettingsForm({ defaultValues }: AiSettingsFormProps) {
+export function AiSettingsForm({
+  defaultValues,
+  openAiAvailable,
+}: AiSettingsFormProps) {
   const [isPending, startTransition] = useTransition()
 
   const {
@@ -59,10 +65,22 @@ export function AiSettingsForm({ defaultValues }: AiSettingsFormProps) {
 
   const textProvider = watch("text_ai_provider")
 
+  useEffect(() => {
+    if (!openAiAvailable && textProvider === "openai") {
+      setValue("text_ai_provider", "gemini")
+    }
+  }, [openAiAvailable, textProvider, setValue])
+
   const onSubmit = handleSubmit(
     (values) => {
       startTransition(async () => {
-        const result = await updateAiSettings(values)
+        const payload = {
+          ...values,
+          text_ai_provider: openAiAvailable
+            ? values.text_ai_provider
+            : ("gemini" as const),
+        }
+        const result = await updateAiSettings(payload)
 
         if (!result.success) {
           toast.error(result.error)
@@ -79,6 +97,18 @@ export function AiSettingsForm({ defaultValues }: AiSettingsFormProps) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
+      {!openAiAvailable ? (
+        <Alert>
+          <AlertDescription>
+            OpenAI is not configured on the server. Add{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              OPENAI_API_KEY
+            </code>{" "}
+            to your environment to enable it. Text generation uses Gemini.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Text Generation</CardTitle>
@@ -107,8 +137,15 @@ export function AiSettingsForm({ defaultValues }: AiSettingsFormProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {TEXT_AI_PROVIDER_OPTIONS.map((provider) => (
-                      <SelectItem key={provider} value={provider}>
+                      <SelectItem
+                        key={provider}
+                        value={provider}
+                        disabled={provider === "openai" && !openAiAvailable}
+                      >
                         {provider === "openai" ? "OpenAI" : "Gemini"}
+                        {provider === "openai" && !openAiAvailable
+                          ? " (not configured)"
+                          : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -160,16 +197,25 @@ export function AiSettingsForm({ defaultValues }: AiSettingsFormProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card
+        className={cn(!openAiAvailable && "opacity-50")}
+      >
         <CardHeader>
           <CardTitle>OpenAI</CardTitle>
           <CardDescription>
-            {textProvider === "openai"
-              ? "Active text provider — model used for caption and copywriting."
-              : "Model used when OpenAI is selected as the text provider."}
+            {!openAiAvailable
+              ? "Not available — OPENAI_API_KEY is not configured on the server."
+              : textProvider === "openai"
+                ? "Active text provider — model used for caption and copywriting."
+                : "Model used when OpenAI is selected as the text provider."}
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
+        <CardContent
+          className={cn(
+            "grid gap-4 md:grid-cols-2",
+            !openAiAvailable && "pointer-events-none",
+          )}
+        >
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="openai_model">Model</Label>
             <Controller
@@ -178,6 +224,7 @@ export function AiSettingsForm({ defaultValues }: AiSettingsFormProps) {
               render={({ field }) => (
                 <Select
                   value={field.value}
+                  disabled={!openAiAvailable || isPending}
                   onValueChange={(value) => {
                     if (value) {
                       field.onChange(value)

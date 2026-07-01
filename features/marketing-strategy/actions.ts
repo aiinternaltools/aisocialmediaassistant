@@ -6,9 +6,14 @@ import { AppError } from "@/lib/errors/app-error"
 import { getWorkspaceUserId } from "@/lib/auth/workspace"
 import {
   campaignFormSchema,
+  getAllowedContentTypes,
+  parseStrategyContentMode,
   parseStrategySteps,
+  strategyStepEditSchema,
   type CampaignFormValues,
+  type StrategyContentMode,
   type StrategyStep,
+  type StrategyStepEditValues,
 } from "@/lib/validations/marketing-campaign"
 import { generateMarketingStrategy } from "@/services/ai/strategy-generation"
 import { createClient } from "@/services/supabase/server"
@@ -417,6 +422,7 @@ export async function setActiveCampaign(
 
 export async function generateCampaignStrategy(
   id: string,
+  contentMode: StrategyContentMode,
 ): Promise<ActionResult<{ steps: StrategyStep[] }>> {
   try {
     const userId = await getAuthUserId()
@@ -443,6 +449,7 @@ export async function generateCampaignStrategy(
       brandProfile,
       settings,
       campaignId: id,
+      contentMode,
     })
 
     const supabase = await createClient()
@@ -450,6 +457,7 @@ export async function generateCampaignStrategy(
       .from("marketing_campaigns")
       .update({
         strategy: result.steps as unknown as Json,
+        strategy_content_mode: contentMode,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
@@ -552,6 +560,67 @@ export async function toggleStrategyStepCompleted(
 
     const updated = steps.map((step) =>
       step.day === day ? { ...step, completed } : step,
+    )
+
+    return persistStrategySteps(userId, campaignId, updated)
+  } catch (error) {
+    return toActionError(error)
+  }
+}
+
+export async function updateStrategyStep(
+  campaignId: string,
+  day: number,
+  values: StrategyStepEditValues,
+): Promise<ActionResult<void>> {
+  try {
+    const userId = await getAuthUserId()
+    const campaign = await getOwnedCampaign(userId, campaignId)
+
+    if (!campaign) {
+      return { success: false, error: "Campaign not found." }
+    }
+
+    const parsed = strategyStepEditSchema.safeParse(values)
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Validation error",
+      }
+    }
+
+    const contentMode = parseStrategyContentMode(campaign.strategy_content_mode)
+    const allowedTypes = getAllowedContentTypes(contentMode)
+
+    if (
+      !allowedTypes.includes(
+        parsed.data.content_type as (typeof allowedTypes)[number],
+      )
+    ) {
+      return {
+        success: false,
+        error: "Content type is not allowed for this campaign's content mode.",
+      }
+    }
+
+    const steps = parseStrategySteps(campaign.strategy)
+    const index = steps.findIndex((s) => s.day === day)
+
+    if (index === -1) {
+      return { success: false, error: "Strategy step not found." }
+    }
+
+    const updated = steps.map((step) =>
+      step.day === day
+        ? {
+            ...step,
+            content_type: parsed.data.content_type,
+            topic: parsed.data.topic,
+            objective: parsed.data.objective,
+            product_reference: parsed.data.product_reference?.trim() || undefined,
+            notes: parsed.data.notes?.trim() || undefined,
+          }
+        : step,
     )
 
     return persistStrategySteps(userId, campaignId, updated)

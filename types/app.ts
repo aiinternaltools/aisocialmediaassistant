@@ -19,6 +19,7 @@ export type {
   StrategyStep,
   CampaignFormValues,
   StrategyContentType,
+  StrategyContentMode,
 } from "@/lib/validations/marketing-campaign"
 
 export type MarketingCampaignRow = Tables<"marketing_campaigns">
