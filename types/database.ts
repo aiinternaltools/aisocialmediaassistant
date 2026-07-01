@@ -340,7 +340,22 @@ export type Database = {
           platform_id?: string;
           post_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "post_platforms_platform_id_fkey";
+            columns: ["platform_id"];
+            isOneToOne: false;
+            referencedRelation: "platforms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "post_platforms_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "posts";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       posts: {
         Row: {
@@ -490,7 +505,29 @@ export type Database = {
           response_payload?: Json | null;
           status?: Database["public"]["Enums"]["publication_status"];
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "publication_logs_platform_connection_id_fkey";
+            columns: ["platform_connection_id"];
+            isOneToOne: false;
+            referencedRelation: "platform_connections";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "publication_logs_platform_id_fkey";
+            columns: ["platform_id"];
+            isOneToOne: false;
+            referencedRelation: "platforms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "publication_logs_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "posts";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       scheduled_jobs: {
         Row: {
