@@ -33,11 +33,10 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  // Fast cookie read for routing only — not used for authorization decisions.
-  // Dashboard layout and server actions validate with getUser() via requireAuth().
+  // Validate JWT server-side — getSession() alone can cause / ↔ /login redirect loops.
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  return { response: supabaseResponse, session }
+  return { response: supabaseResponse, user }
 }
