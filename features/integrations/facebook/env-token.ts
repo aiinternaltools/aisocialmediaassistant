@@ -81,3 +81,48 @@ export async function buildFacebookTokensFromEnv(): Promise<OAuthTokens> {
     },
   }
 }
+
+type InstagramBusinessAccount = {
+  id: string
+  username?: string
+}
+
+type PageWithInstagram = {
+  id: string
+  name: string
+  instagram_business_account?: InstagramBusinessAccount
+}
+
+export async function resolveInstagramFromPageToken(
+  accessToken: string,
+): Promise<{ page: { id: string; name: string }; igAccount: InstagramBusinessAccount }> {
+  const configuredPageId = process.env.FACEBOOK_PAGE_ID?.trim()
+
+  const page = configuredPageId
+    ? await graphRequest<PageWithInstagram>(`/${configuredPageId}`, {
+        accessToken,
+        params: {
+          fields: "id,name,instagram_business_account{id,username}",
+        },
+      })
+    : await graphRequest<PageWithInstagram>("/me", {
+        accessToken,
+        params: {
+          fields: "id,name,instagram_business_account{id,username}",
+        },
+      })
+
+  if (!page.instagram_business_account?.id) {
+    throw new IntegrationError({
+      code: "OAUTH_FAILED",
+      message: `Page "${page.name}" has no linked Instagram Business account`,
+      userMessage:
+        "This Facebook Page is not linked to an Instagram Business account. Connect one in Meta Business Suite, then try again.",
+    })
+  }
+
+  return {
+    page: { id: page.id, name: page.name },
+    igAccount: page.instagram_business_account,
+  }
+}

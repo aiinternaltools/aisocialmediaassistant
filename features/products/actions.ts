@@ -20,6 +20,7 @@ import {
 } from "@/services/ai/gemini-models"
 import { createAdminClient } from "@/services/supabase/admin"
 import { createClient } from "@/services/supabase/server"
+import { createAdminSignedUrl } from "@/services/storage/upload"
 import type { ActionResult, SettingsBundle } from "@/types/app"
 import type { Tables } from "@/types/database"
 
@@ -575,6 +576,46 @@ export async function getProducts(): Promise<ActionResult<ProductRow[]>> {
     }
 
     return { success: true, data: data ?? [] }
+  } catch (error) {
+    return { success: false, error: AppError.fromUnknown(error).userMessage }
+  }
+}
+
+export async function getProductImageUrls(
+  products: Pick<ProductRow, "id" | "image_storage_path" | "metadata">[],
+): Promise<ActionResult<Record<string, string>>> {
+  try {
+    await getAuthUserId()
+
+    const imageUrls: Record<string, string> = {}
+
+    await Promise.all(
+      products.map(async (product) => {
+        if (product.image_storage_path) {
+          const url = await createAdminSignedUrl(
+            "product-images",
+            product.image_storage_path,
+            60 * 60,
+          )
+          if (url) {
+            imageUrls[product.id] = url
+          }
+          return
+        }
+
+        const meta = product.metadata as Record<string, unknown> | null
+        const externalUrl =
+          typeof meta?.original_image_url === "string"
+            ? meta.original_image_url
+            : null
+
+        if (externalUrl) {
+          imageUrls[product.id] = externalUrl
+        }
+      }),
+    )
+
+    return { success: true, data: imageUrls }
   } catch (error) {
     return { success: false, error: AppError.fromUnknown(error).userMessage }
   }

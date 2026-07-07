@@ -1,3 +1,4 @@
+import { cache } from "react"
 import type { User } from "@supabase/supabase-js"
 
 import { isAdminEmail } from "@/lib/auth/admin"
@@ -139,9 +140,7 @@ export async function initializeWorkspaceForUser(userId: string): Promise<string
   return ownerId
 }
 
-export async function getWorkspaceOwnerId(): Promise<string> {
-  const user = await requireAuth()
-
+function assertAdminUser(user: User): void {
   if (!isAdminEmail(user.email)) {
     throw new AppError({
       code: "UNAUTHORIZED",
@@ -149,9 +148,19 @@ export async function getWorkspaceOwnerId(): Promise<string> {
       userMessage: "You are not authorized to access this workspace.",
     })
   }
+}
+
+export const getWorkspaceOwnerId = cache(async (): Promise<string> => {
+  const user = await requireAuth()
+  assertAdminUser(user)
 
   const envOwner = getEnvWorkspaceOwnerId()
   if (envOwner) {
+    const existing = await readWorkspaceOwnerFromDb()
+    if (existing === envOwner) {
+      return envOwner
+    }
+
     const pinnedOwner = await pinWorkspaceOwner(envOwner)
     await ensureWorkspaceMember(user.id)
 
@@ -169,16 +178,15 @@ export async function getWorkspaceOwnerId(): Promise<string> {
 
   const existing = await readWorkspaceOwnerFromDb()
   if (existing) {
-    await ensureWorkspaceMember(user.id)
     return existing
   }
 
   return initializeWorkspaceForUser(user.id)
-}
+})
 
-export async function getWorkspaceUserId(): Promise<string> {
+export const getWorkspaceUserId = cache(async (): Promise<string> => {
   return getWorkspaceOwnerId()
-}
+})
 
 export async function requireAdminAuth(): Promise<{
   user: User

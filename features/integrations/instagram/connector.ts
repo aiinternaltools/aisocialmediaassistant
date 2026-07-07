@@ -4,10 +4,15 @@ import {
   isMetaDevStubMode,
 } from "@/features/integrations/facebook/config"
 import {
+  getEnvFacebookPageAccessToken,
+  resolveInstagramFromPageToken,
+} from "@/features/integrations/facebook/env-token"
+import {
   exchangeCodeForToken,
   exchangeForLongLivedToken,
   graphRequest,
 } from "@/features/integrations/facebook/meta-graph-client"
+import { IntegrationError } from "@/features/integrations/shared/errors"
 import type {
   ConnectionContext,
   OAuthTokens,
@@ -40,6 +45,27 @@ type MeAccountsResponse = {
   data: PageWithInstagram[]
 }
 
+async function queryPageInstagramAccount(
+  page: PageWithInstagram,
+  fallbackUserToken: string,
+): Promise<InstagramAccount | null> {
+  if (page.instagram_business_account?.id) {
+    return page.instagram_business_account
+  }
+
+  const token = page.access_token ?? fallbackUserToken
+  const detail = await graphRequest<{
+    instagram_business_account?: InstagramAccount
+  }>(`/${page.id}`, {
+    accessToken: token,
+    params: { fields: "instagram_business_account{id,username}" },
+  })
+
+  return detail.instagram_business_account?.id
+    ? detail.instagram_business_account
+    : null
+}
+
 async function resolveInstagramAccount(
   accessToken: string,
 ): Promise<{ page: PageWithInstagram; igAccount: InstagramAccount }> {
@@ -50,13 +76,40 @@ async function resolveInstagramAccount(
     },
   })
 
-  for (const page of response.data ?? []) {
-    if (page.instagram_business_account?.id) {
-      return { page, igAccount: page.instagram_business_account }
+  const pages = response.data ?? []
+  for (const page of pages) {
+    const igAccount = await queryPageInstagramAccount(page, accessToken)
+    if (igAccount?.id) {
+      return { page, igAccount }
     }
   }
 
-  throw new Error("No Instagram Business account linked to Facebook Pages")
+  const pageNames = pages.map((page) => page.name).join(", ")
+  throw new IntegrationError({
+    code: "OAUTH_FAILED",
+    message: `No Instagram Business account linked to Facebook Pages (found: ${pageNames || "none"})`,
+    userMessage:
+      "No Instagram Business account is linked to your Facebook Pages.",
+  })
+}
+
+export async function buildInstagramTokensFromEnv(): Promise<OAuthTokens> {
+  const accessToken = getEnvFacebookPageAccessToken()
+  const { page, igAccount } = await resolveInstagramFromPageToken(accessToken)
+
+  return {
+    accessToken,
+    refreshToken: null,
+    expiresAt: null,
+    scopes: INSTAGRAM_SCOPES,
+    externalAccountId: igAccount.id,
+    accountName: igAccount.username ?? page.name,
+    metadata: {
+      igUserId: igAccount.id,
+      pageId: page.id,
+      source: "env_page_token",
+    },
+  }
 }
 
 function buildDevStubTokens(): OAuthTokens {

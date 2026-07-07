@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache"
 
 import { z } from "zod"
 
-import { requireAuth } from "@/lib/auth/require-auth"
 import { getWorkspaceUserId } from "@/lib/auth/workspace"
 import { AppError } from "@/lib/errors/app-error"
 import {
@@ -206,7 +205,7 @@ export async function updateAppSettings(
 
 export async function getEnabledPlatforms(): Promise<ActionResult<PlatformRow[]>> {
   try {
-    await requireAuth()
+    await getWorkspaceUserId()
     const supabase = await createClient()
 
     const { data, error } = await supabase
