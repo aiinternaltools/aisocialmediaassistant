@@ -1,3 +1,4 @@
+import { getMetaAppConfig } from "@/features/integrations/facebook/config"
 import { graphRequest } from "@/features/integrations/facebook/meta-graph-client"
 import { IntegrationError } from "@/features/integrations/shared/errors"
 import { decryptToken } from "@/features/integrations/shared/token-encryption"
@@ -36,6 +37,65 @@ export function getEnvFacebookPageAccessToken(): string {
     })
   }
   return token
+}
+
+export type PageTokenStatus = {
+  isValid: boolean
+  expiresAt: string | null
+  error: string | null
+}
+
+export async function inspectEnvPageToken(): Promise<PageTokenStatus | null> {
+  if (!hasEnvFacebookPageToken()) {
+    return null
+  }
+
+  const config = getMetaAppConfig()
+  if (!config) {
+    return { isValid: false, expiresAt: null, error: "App credentials not configured" }
+  }
+
+  const inputToken = getEnvFacebookPageAccessToken()
+  const appAccessToken = `${config.appId}|${config.appSecret}`
+
+  try {
+    const result = await graphRequest<{
+      data?: {
+        is_valid?: boolean
+        expires_at?: number
+        error?: { message?: string }
+      }
+    }>("/debug_token", {
+      params: {
+        input_token: inputToken,
+        access_token: appAccessToken,
+      },
+    })
+
+    const data = result.data
+    if (!data) {
+      return { isValid: false, expiresAt: null, error: "Token validation returned no data" }
+    }
+
+    if (data.is_valid === false) {
+      return {
+        isValid: false,
+        expiresAt: null,
+        error: data.error?.message ?? "Page access token is invalid",
+      }
+    }
+
+    const expiresAt =
+      data.expires_at && data.expires_at > 0
+        ? new Date(data.expires_at * 1000).toISOString()
+        : null
+
+    return { isValid: true, expiresAt, error: null }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to validate page token"
+    return { isValid: false, expiresAt: null, error: message }
+  }
 }
 
 type EnvPageTokenConnection = {

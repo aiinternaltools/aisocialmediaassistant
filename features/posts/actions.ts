@@ -11,6 +11,7 @@ import {
   type PostFilterValues,
   type PostFormValues,
 } from "@/lib/validations/post"
+import { duplicatePostMedia } from "@/features/posts/lib/duplicate-post-media"
 import { createClient } from "@/services/supabase/server"
 import {
   cancelPendingScheduledJobs,
@@ -800,8 +801,11 @@ export async function duplicatePost(
       await syncPostPlatforms(duplicate.id, platformIds)
     }
 
+    await duplicatePostMedia(userId, postId, duplicate.id)
+
     revalidatePath("/")
     revalidatePath("/posts")
+    revalidatePath(`/posts/${duplicate.id}/edit`)
 
     return { success: true, data: { id: duplicate.id } }
   } catch (error) {

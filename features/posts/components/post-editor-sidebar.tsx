@@ -50,7 +50,7 @@ function ChecklistItem({
       <div className="min-w-0">
         <p
           className={cn(
-            "text-sm font-medium",
+            "text-xs font-medium",
             done ? "text-foreground" : "text-muted-foreground",
           )}
         >
@@ -98,9 +98,11 @@ export function PostEditorSidebar({
   return (
     <div className="space-y-4">
       <Card className="border-primary/10 bg-card shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Post overview</CardTitle>
-          <CardDescription>Current state and what happens next.</CardDescription>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Post overview</CardTitle>
+          <CardDescription className="text-xs">
+            Current state and what happens next.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg border bg-muted/30 p-3">
@@ -108,7 +110,7 @@ export function PostEditorSidebar({
               Current status
             </p>
             <PostStatusBadge status={currentStatus} />
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
               {getStatusHelp(currentStatus)}
             </p>
           </div>
@@ -118,7 +120,7 @@ export function PostEditorSidebar({
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 After save
               </p>
-              <p className="mt-1 text-sm">
+              <p className="mt-1 text-xs leading-relaxed">
                 Saving will mark this post as{" "}
                 <span className="font-medium text-foreground">
                   {formatPostStatus(saveStatusPreview)}
@@ -135,9 +137,9 @@ export function PostEditorSidebar({
       </Card>
 
       <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Readiness</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Readiness</CardTitle>
+          <CardDescription className="text-xs">
             {readyToPublish
               ? "Ready to schedule or publish."
               : "Complete the items below before publishing."}
@@ -187,10 +189,10 @@ export function PostEditorSidebar({
       </Card>
 
       <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Actions guide</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Actions guide</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+        <CardContent className="space-y-3 text-xs">
           <div className="flex gap-2.5">
             <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div>
@@ -229,18 +231,39 @@ export function PostEditorSidebar({
 export function PostEditorSectionIcon({
   icon: Icon,
   className,
+  variant = "default",
+  size = "md",
 }: {
   icon: typeof FileText
   className?: string
+  variant?: "default" | "violet" | "primary" | "sky" | "amber"
+  size?: "sm" | "md"
 }) {
+  const variantClassName = {
+    default: "border-border/80 bg-muted/70 text-foreground",
+    violet:
+      "border-violet-200/80 bg-violet-50 text-violet-600 dark:border-violet-800/50 dark:bg-violet-950/50 dark:text-violet-400",
+    primary: "border-primary/20 bg-primary/10 text-primary",
+    sky: "border-sky-200/80 bg-sky-50 text-sky-600 dark:border-sky-800/50 dark:bg-sky-950/50 dark:text-sky-400",
+    amber:
+      "border-amber-200/80 bg-amber-50 text-amber-600 dark:border-amber-800/50 dark:bg-amber-950/50 dark:text-amber-400",
+  } as const
+
+  const sizeClassName = {
+    sm: "size-8 [&_svg]:size-4",
+    md: "size-10 [&_svg]:size-[1.125rem]",
+  } as const
+
   return (
     <span
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-lg border bg-muted/50",
+        "flex shrink-0 items-center justify-center rounded-lg border shadow-sm",
+        sizeClassName[size],
+        variantClassName[variant],
         className,
       )}
     >
-      <Icon className="size-4" />
+      <Icon strokeWidth={2.25} />
     </span>
   )
 }

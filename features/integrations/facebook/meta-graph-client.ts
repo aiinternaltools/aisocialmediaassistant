@@ -156,10 +156,13 @@ export async function graphRequest<T = Record<string, unknown>>(
   if (!response.ok || payload.error) {
     const metaMessage =
       payload.error?.message ?? `Graph API request failed (${response.status})`
+    const isExpiredSession = metaMessage.includes("Session has expired")
     throw new IntegrationError({
       code: "EXTERNAL_SERVICE",
       message: metaMessage,
-      userMessage: `Meta API error: ${metaMessage}`,
+      userMessage: isExpiredSession
+        ? "Facebook Page access token has expired. Generate a new token in Meta, update FACEBOOK_PAGE_ACCESS_TOKEN on Vercel, then redeploy."
+        : `Meta API error: ${metaMessage}`,
       cause: payload.error,
     })
   }

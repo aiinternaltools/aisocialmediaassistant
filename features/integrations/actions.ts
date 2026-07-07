@@ -9,9 +9,15 @@ import {
   getOAuthRedirectUri,
 } from "@/features/integrations/facebook/config"
 import {
+  getLinkedInAppConfig,
+  getLinkedInOAuthRedirectUri,
+  LINKEDIN_SCOPES,
+} from "@/features/integrations/linkedin/config"
+import {
   buildFacebookTokensFromEnv,
   getEnvFacebookPageAccessToken,
   hasEnvFacebookPageToken,
+  inspectEnvPageToken,
 } from "@/features/integrations/facebook/env-token"
 import { buildInstagramTokensFromEnv } from "@/features/integrations/instagram/connector"
 import "@/features/integrations/registry"
@@ -178,6 +184,9 @@ export async function connectInstagramWithEnvPageToken(): Promise<ActionResult> 
 export type MetaEnvDiagnostics = {
   pageTokenConfigured: boolean
   pageTokenLength: number
+  pageTokenValid: boolean | null
+  pageTokenExpiresAt: string | null
+  pageTokenError: string | null
   metaAppConfigured: boolean
   encryptionKeyConfigured: boolean
 }
@@ -190,8 +199,10 @@ export async function getMetaEnvDiagnostics(): Promise<
     await requireAuth()
 
     let pageTokenLength = 0
+    let pageTokenStatus: Awaited<ReturnType<typeof inspectEnvPageToken>> = null
     if (hasEnvFacebookPageToken()) {
       pageTokenLength = getEnvFacebookPageAccessToken().length
+      pageTokenStatus = await inspectEnvPageToken()
     }
 
     let encryptionKeyConfigured = false
@@ -207,7 +218,46 @@ export async function getMetaEnvDiagnostics(): Promise<
       data: {
         pageTokenConfigured: hasEnvFacebookPageToken(),
         pageTokenLength,
+        pageTokenValid: pageTokenStatus?.isValid ?? null,
+        pageTokenExpiresAt: pageTokenStatus?.expiresAt ?? null,
+        pageTokenError: pageTokenStatus?.error ?? null,
         metaAppConfigured: getMetaAppConfig() !== null,
+        encryptionKeyConfigured,
+      },
+    }
+  } catch (error) {
+    return toActionError(error)
+  }
+}
+
+export type LinkedInEnvDiagnostics = {
+  appConfigured: boolean
+  redirectUri: string
+  scopes: string[]
+  encryptionKeyConfigured: boolean
+}
+
+/** Safe server-side check for LinkedIn OAuth setup (no secrets exposed). */
+export async function getLinkedInEnvDiagnostics(): Promise<
+  ActionResult<LinkedInEnvDiagnostics>
+> {
+  try {
+    await requireAuth()
+
+    let encryptionKeyConfigured = false
+    try {
+      encryptToken("probe")
+      encryptionKeyConfigured = true
+    } catch {
+      encryptionKeyConfigured = false
+    }
+
+    return {
+      success: true,
+      data: {
+        appConfigured: getLinkedInAppConfig() !== null,
+        redirectUri: getLinkedInOAuthRedirectUri(),
+        scopes: [...LINKEDIN_SCOPES],
         encryptionKeyConfigured,
       },
     }

@@ -1,13 +1,13 @@
 import { Header } from "@/components/layout/header"
 import { Sidebar } from "@/components/layout/sidebar"
-import { getSessionUser } from "@/lib/auth/session"
+import { requireAdmin } from "@/lib/auth/require-auth"
 
 export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const user = await getSessionUser()
+  const user = await requireAdmin()
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

@@ -69,14 +69,18 @@ export default async function EditPostPage({ params }: EditPostPageProps) {
     : null
 
   const scheduleHint = post.scheduled_at
-    ? `Scheduled for ${formatScheduleDisplay(post.scheduled_at, post.timezone)} (${post.timezone})`
-    : "Not scheduled — saves as draft until you set a future date."
+    ? `Scheduled for ${formatScheduleDisplay(post.scheduled_at, post.timezone)} (${post.timezone}).`
+    : null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title={post.title}
-        description={`Edit content, media, platforms, and schedule. ${scheduleHint}`}
+        description={
+          scheduleHint
+            ? `Edit content, media, platforms, and schedule. ${scheduleHint}`
+            : "Edit content, media, platforms, and schedule."
+        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <PostStatusBadge status={post.status} />

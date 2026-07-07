@@ -26,9 +26,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -56,7 +53,12 @@ import { AiTextToolbar } from "@/features/posts/components/ai-text-toolbar"
 import { ScheduleDateTimePicker } from "@/features/calendar/components/schedule-datetime-picker"
 import { MediaSection } from "@/features/posts/components/media-section"
 import {
-  PostEditorSectionIcon,
+  PostEditorFieldHint,
+  PostEditorGroupLabel,
+  PostEditorSection,
+  PostEditorSectionHeader,
+} from "@/features/posts/components/post-editor-typography"
+import {
   PostEditorSidebar,
 } from "@/features/posts/components/post-editor-sidebar"
 import { PostStatusBadge } from "@/features/posts/components/post-status-badge"
@@ -394,7 +396,7 @@ export function PostEditor({
 
   return (
     <>
-    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
       {isEditMode && currentStatus ? (
         <Alert
           className={cn(
@@ -409,11 +411,11 @@ export function PostEditor({
               "border-sky-500/30 bg-sky-500/5",
           )}
         >
-          <AlertTitle className="flex flex-wrap items-center gap-2">
+          <AlertTitle className="flex flex-wrap items-center gap-2 text-sm font-semibold">
             <span>You are editing this post</span>
             <PostStatusBadge status={currentStatus} />
           </AlertTitle>
-          <AlertDescription>
+          <AlertDescription className="text-sm">
             {currentStatus === "publishing"
               ? "Publication is running. Save and publish actions are temporarily disabled."
               : currentStatus === "published"
@@ -433,32 +435,28 @@ export function PostEditor({
           isEditMode ? "lg:grid-cols-[minmax(0,1fr)_280px]" : "",
         )}
       >
-        <div className="min-w-0 space-y-6">
-          <Card className="shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <PostEditorSectionIcon
-                    icon={Megaphone}
-                    className="text-violet-600 dark:text-violet-400"
+        <div className="min-w-0 space-y-8">
+          <div className="space-y-6 rounded-xl border border-dashed border-border/70 bg-muted/15 p-5 sm:p-6">
+            <PostEditorGroupLabel>Optional setup</PostEditorGroupLabel>
+
+            <PostEditorSection>
+              <PostEditorSectionHeader
+                tier="secondary"
+                icon={Megaphone}
+                iconVariant="violet"
+                title="Marketing strategy"
+                description="Use your active campaign to guide AI caption generation step by step."
+                action={
+                  <Switch
+                    checked={useMarketingStrategy}
+                    onCheckedChange={handleStrategyToggle}
+                    aria-label="Use marketing strategy"
                   />
-                  <div>
-                    <CardTitle>Marketing strategy</CardTitle>
-                    <CardDescription>
-                      Use your active campaign to guide AI caption generation
-                      step by step.
-                    </CardDescription>
-                  </div>
-                </div>
-                <Switch
-                  checked={useMarketingStrategy}
-                  onCheckedChange={handleStrategyToggle}
-                  aria-label="Use marketing strategy"
-                />
-              </div>
-            </CardHeader>
-            {useMarketingStrategy ? (
-              <CardContent className="space-y-3">
+                }
+              />
+              {useMarketingStrategy ? (
+                <Card className="shadow-sm">
+                  <CardContent className="space-y-3 pt-5">
                 {!campaignContext ? (
                   <Alert>
                     <AlertTitle>No active campaign</AlertTitle>
@@ -535,29 +533,22 @@ export function PostEditor({
                     </Link>
                   </>
                 )}
-              </CardContent>
-            ) : null}
-          </Card>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </PostEditorSection>
 
-          {products.length > 0 && (
-            <Card className="shadow-sm">
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-3">
-                  <PostEditorSectionIcon
-                    icon={Package}
-                    className="text-amber-600 dark:text-amber-400"
-                  />
-                  <div>
-                    <CardTitle>Product context</CardTitle>
-                    <CardDescription>
-                      Optionally link a product or service. AI will incorporate
-                      its description in captions and use its image as a
-                      reference when generating visuals.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
+          {products.length > 0 ? (
+            <PostEditorSection>
+              <PostEditorSectionHeader
+                tier="secondary"
+                icon={Package}
+                iconVariant="amber"
+                title="Product context"
+                description="Optionally link a product or service. AI will incorporate its description in captions and use its image as a reference when generating visuals."
+              />
+              <Card className="shadow-sm">
+                <CardContent className="pt-5">
                 {selectedProduct ? (
                   <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -610,23 +601,25 @@ export function PostEditor({
                     </SelectContent>
                   </Select>
                 )}
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            </PostEditorSection>
+          ) : null}
+          </div>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <div className="flex items-start gap-3">
-                <PostEditorSectionIcon icon={Type} />
-                <div>
-                  <CardTitle>Content</CardTitle>
-                  <CardDescription>
-                    Internal title and the caption your audience will see.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div className="space-y-8">
+            <PostEditorGroupLabel className="mb-1 block">
+              Compose & publish
+            </PostEditorGroupLabel>
+
+            <PostEditorSection>
+              <PostEditorSectionHeader
+                icon={Type}
+                title="Content"
+                description="Internal title and the caption your audience will see."
+              />
+              <Card className="shadow-sm">
+                <CardContent className="space-y-5 pt-5">
               <div className="space-y-2">
                 <Label htmlFor="title">Title</Label>
                 <Input
@@ -634,9 +627,9 @@ export function PostEditor({
                   placeholder="e.g. Summer product launch announcement"
                   {...form.register("title")}
                 />
-                <p className="text-xs text-muted-foreground">
+                <PostEditorFieldHint>
                   For your reference only — not sent to social platforms.
-                </p>
+                </PostEditorFieldHint>
                 {form.formState.errors.title ? (
                   <p className="text-sm text-destructive">
                     {form.formState.errors.title.message}
@@ -705,25 +698,19 @@ export function PostEditor({
                   strategyStep={strategyStepForAi}
                 />
               </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </PostEditorSection>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <div className="flex items-start gap-3">
-                <PostEditorSectionIcon
-                  icon={ImageIcon}
-                  className="text-violet-600 dark:text-violet-400"
-                />
-                <div>
-                  <CardTitle>Media</CardTitle>
-                  <CardDescription>
-                    Optional image or video. AI images use your caption above.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
+            <PostEditorSection>
+              <PostEditorSectionHeader
+                icon={ImageIcon}
+                iconVariant="violet"
+                title="Media"
+                description="Optional image or video. AI images use your caption above."
+              />
+              <Card className="shadow-sm">
+                <CardContent className="pt-5">
               <MediaSection
                 postId={postId}
                 postContent={content}
@@ -735,25 +722,19 @@ export function PostEditor({
                 }
                 productContext={productContextForMedia}
               />
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </PostEditorSection>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <div className="flex items-start gap-3">
-                <PostEditorSectionIcon
-                  icon={Share2}
-                  className="text-primary"
-                />
-                <div>
-                  <CardTitle>Platforms</CardTitle>
-                  <CardDescription>
-                    Select where this post should be published.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
+            <PostEditorSection>
+              <PostEditorSectionHeader
+                icon={Share2}
+                iconVariant="primary"
+                title="Platforms"
+                description="Select where this post should be published."
+              />
+              <Card className="shadow-sm">
+                <CardContent className="space-y-3 pt-5">
               {platforms.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No platforms available. Connect Facebook or Instagram in
@@ -796,27 +777,20 @@ export function PostEditor({
                   {form.formState.errors.platform_ids.message}
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </PostEditorSection>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <div className="flex items-start gap-3">
-                <PostEditorSectionIcon
-                  icon={CalendarClock}
-                  className="text-sky-600 dark:text-sky-400"
-                />
-                <div>
-                  <CardTitle>Schedule</CardTitle>
-                  <CardDescription>
-                    Pick a future date and time in the timezone below. That
-                    timezone controls when the post publishes.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <PostEditorSection>
+              <PostEditorSectionHeader
+                icon={CalendarClock}
+                iconVariant="sky"
+                title="Schedule"
+                description="Pick a future date and time in the timezone below. That timezone controls when the post publishes."
+              />
+              <Card className="shadow-sm">
+                <CardContent className="space-y-4 pt-5">
+              <div className="rounded-lg border bg-muted/30 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
                 <strong className="font-medium text-foreground">Draft</strong>{" "}
                 — no date or a past date.{" "}
                 <strong className="font-medium text-foreground">Scheduled</strong>{" "}
@@ -865,21 +839,23 @@ export function PostEditor({
                       {form.formState.errors.timezone.message}
                     </p>
                   ) : (
-                    <p className="text-xs text-muted-foreground">
+                    <PostEditorFieldHint>
                       Example: 4:00 PM with Europe/London publishes at 4:00 PM
                       UK time (not your computer&apos;s local time).
-                    </p>
+                    </PostEditorFieldHint>
                   )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </PostEditorSection>
+          </div>
 
           <Card className="border-dashed shadow-sm">
-            <CardContent className="flex flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">Ready to finish?</p>
-                <p className="text-muted-foreground">
+            <CardContent className="flex flex-col gap-4 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <p className="text-base font-semibold">Ready to finish?</p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   {isEditMode
                     ? "Save your work or publish immediately. A future date and platform will schedule automatically."
                     : willScheduleOnCreate

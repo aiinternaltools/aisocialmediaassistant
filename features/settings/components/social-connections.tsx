@@ -22,7 +22,6 @@ import {
   connectPlatform,
   disconnectPlatform,
   refreshConnection,
-  type MetaEnvDiagnostics,
 } from "@/features/integrations/actions"
 import {
   getPlatformBrandStyle,
@@ -34,7 +33,6 @@ import { cn } from "@/lib/utils"
 interface SocialConnectionsProps {
   platforms: PlatformWithConnection[]
   facebookEnvTokenAvailable?: boolean
-  metaEnvDiagnostics?: MetaEnvDiagnostics | null
 }
 
 function getConnectionLabel(
@@ -63,7 +61,6 @@ function isConnected(connection: PlatformWithConnection["connection"]): boolean 
 export function SocialConnections({
   platforms,
   facebookEnvTokenAvailable = false,
-  metaEnvDiagnostics = null,
 }: SocialConnectionsProps) {
   const router = useRouter()
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
@@ -150,35 +147,11 @@ export function SocialConnections({
         Connect your social accounts to publish posts.
       </p>
 
-      {facebookEnvTokenAvailable && metaEnvDiagnostics ? (
-        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-          <p className="font-medium">Server env (Meta page token flow)</p>
-          <ul className="mt-2 space-y-1 text-muted-foreground">
-            <li>
-              {metaEnvDiagnostics.pageTokenConfigured
-                ? `✓ Page token (${metaEnvDiagnostics.pageTokenLength} chars)`
-                : "✗ FACEBOOK_PAGE_ACCESS_TOKEN missing"}
-            </li>
-            <li>
-              {metaEnvDiagnostics.metaAppConfigured
-                ? "✓ App ID + secret"
-                : "✗ FACEBOOK_APP_ID / FACEBOOK_APP_SECRET missing"}
-            </li>
-            <li>
-              {metaEnvDiagnostics.encryptionKeyConfigured
-                ? "✓ TOKEN_ENCRYPTION_KEY"
-                : "✗ TOKEN_ENCRYPTION_KEY missing"}
-            </li>
-          </ul>
-        </div>
-      ) : null}
-
       <div className="grid gap-4 md:grid-cols-2">
         {platforms.map((platform) => {
           const status = getConnectionLabel(platform.connection)
           const connected = isConnected(platform.connection)
           const isLoading = loadingPlatform === platform.id
-          const isLinkedIn = platform.id === "linkedin"
           const usesEnvPageToken =
             (platform.id === "facebook" || platform.id === "instagram") &&
             facebookEnvTokenAvailable
@@ -237,7 +210,7 @@ export function SocialConnections({
               <CardFooter className="flex flex-wrap gap-2">
                 {usesEnvPageToken ? (
                   <Button
-                    disabled={isLoading || isLinkedIn}
+                    disabled={isLoading}
                     onClick={() => void handleConnectWithEnvToken(platform.id as "facebook" | "instagram")}
                   >
                     {isLoading && !connected ? (
@@ -251,7 +224,7 @@ export function SocialConnections({
                   </Button>
                 ) : (
                   <Button
-                    disabled={isLoading || isLinkedIn}
+                    disabled={isLoading}
                     onClick={() => handleConnect(platform.id)}
                   >
                     {isLoading && !connected ? (
@@ -274,7 +247,7 @@ export function SocialConnections({
                 </Button>
                 <Button
                   variant="outline"
-                  disabled={isLoading || !connected || isLinkedIn}
+                  disabled={isLoading || !connected}
                   onClick={() => handleRefresh(platform.id)}
                 >
                   {isLoading ? (

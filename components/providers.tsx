@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes"
 import { useState } from "react"
 
 import { Toaster } from "@/components/ui/sonner"
+import { NavigationProgress } from "@/components/layout/navigation-progress"
 
 interface ProvidersProps {
   children: React.ReactNode
@@ -32,6 +33,7 @@ export function Providers({ children }: ProvidersProps) {
         disableTransitionOnChange
       >
         {children}
+        <NavigationProgress />
         <Toaster richColors closeButton position="top-right" />
       </ThemeProvider>
     </QueryClientProvider>
