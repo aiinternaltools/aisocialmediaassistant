@@ -1,3 +1,5 @@
+import { createHmac } from "crypto"
+
 import { getMetaAppConfig } from "@/features/integrations/facebook/config"
 import { IntegrationError } from "@/features/integrations/shared/errors"
 
@@ -44,15 +46,37 @@ function toFormBody(params: Record<string, string | undefined>): string {
   return body.toString()
 }
 
+function buildAppSecretProof(accessToken: string, appSecret: string): string {
+  return createHmac("sha256", appSecret).update(accessToken).digest("hex")
+}
+
+function withAppSecretProof(
+  params: Record<string, string | undefined>,
+  accessToken?: string,
+): Record<string, string | undefined> {
+  const config = getMetaAppConfig()
+  if (!config || !accessToken) {
+    return params
+  }
+
+  return {
+    ...params,
+    appsecret_proof: buildAppSecretProof(accessToken, config.appSecret),
+  }
+}
+
 export async function graphRequest<T = Record<string, unknown>>(
   path: string,
   options: GraphRequestOptions = {},
 ): Promise<T> {
   const method = options.method ?? "GET"
-  const params = {
-    ...options.params,
-    access_token: options.accessToken,
-  }
+  const params = withAppSecretProof(
+    {
+      ...options.params,
+      access_token: options.accessToken,
+    },
+    options.accessToken,
+  )
 
   const filteredParams = Object.fromEntries(
     Object.entries(params).filter(([, value]) => value !== undefined),
@@ -86,10 +110,12 @@ export async function graphRequest<T = Record<string, unknown>>(
   const payload = (await response.json()) as GraphResponse<T>
 
   if (!response.ok || payload.error) {
+    const metaMessage =
+      payload.error?.message ?? `Graph API request failed (${response.status})`
     throw new IntegrationError({
       code: "EXTERNAL_SERVICE",
-      message: payload.error?.message ?? `Graph API request failed (${response.status})`,
-      userMessage: "Meta API request failed. Please try again.",
+      message: metaMessage,
+      userMessage: `Meta API error: ${metaMessage}`,
       cause: payload.error,
     })
   }

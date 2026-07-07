@@ -4,7 +4,10 @@ import { randomBytes } from "crypto"
 import { cookies } from "next/headers"
 import { revalidatePath } from "next/cache"
 
-import { getOAuthRedirectUri } from "@/features/integrations/facebook/config"
+import {
+  getMetaAppConfig,
+  getOAuthRedirectUri,
+} from "@/features/integrations/facebook/config"
 import {
   buildFacebookTokensFromEnv,
   hasEnvFacebookPageToken,
@@ -106,6 +109,19 @@ export async function connectPlatform(
   }
 }
 
+function assertMetaAppCredentialsForEnvToken(): void {
+  if (getMetaAppConfig()) {
+    return
+  }
+
+  throw new AppError({
+    code: "VALIDATION",
+    message: "Meta app credentials missing for env token flow",
+    userMessage:
+      "Set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET on the server (Vercel → Production). Meta requires them for server-side Graph API calls.",
+  })
+}
+
 /** Connect Facebook using FACEBOOK_PAGE_ACCESS_TOKEN (same approach as n8n). */
 export async function connectFacebookWithEnvToken(): Promise<ActionResult> {
   try {
@@ -119,6 +135,8 @@ export async function connectFacebookWithEnvToken(): Promise<ActionResult> {
           "Add FACEBOOK_PAGE_ACCESS_TOKEN to your server environment (Vercel), then redeploy.",
       })
     }
+
+    assertMetaAppCredentialsForEnvToken()
 
     const tokens = await buildFacebookTokensFromEnv()
     await upsertPlatformConnectionFromOAuth(workspaceUserId, "facebook", tokens)
@@ -143,6 +161,8 @@ export async function connectInstagramWithEnvPageToken(): Promise<ActionResult> 
           "Add FACEBOOK_PAGE_ACCESS_TOKEN to your server environment (Vercel), then redeploy.",
       })
     }
+
+    assertMetaAppCredentialsForEnvToken()
 
     const tokens = await buildInstagramTokensFromEnv()
     await upsertPlatformConnectionFromOAuth(workspaceUserId, "instagram", tokens)

@@ -10,12 +10,23 @@ const FACEBOOK_SCOPES = [
   "public_profile",
 ]
 
+function normalizeEnvValue(value: string | undefined): string {
+  const trimmed = value?.trim() ?? ""
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim()
+  }
+  return trimmed
+}
+
 export function hasEnvFacebookPageToken(): boolean {
-  return Boolean(process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim())
+  return Boolean(normalizeEnvValue(process.env.FACEBOOK_PAGE_ACCESS_TOKEN))
 }
 
 export function getEnvFacebookPageAccessToken(): string {
-  const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN?.trim()
+  const token = normalizeEnvValue(process.env.FACEBOOK_PAGE_ACCESS_TOKEN)
   if (!token) {
     throw new IntegrationError({
       code: "VALIDATION",
@@ -60,8 +71,8 @@ export function resolveConnectionAccessToken(
 async function resolvePageFromToken(
   accessToken: string,
 ): Promise<{ id: string; name: string }> {
-  const configuredPageId = process.env.FACEBOOK_PAGE_ID?.trim()
-  const configuredPageName = process.env.FACEBOOK_PAGE_NAME?.trim()
+  const configuredPageId = normalizeEnvValue(process.env.FACEBOOK_PAGE_ID)
+  const configuredPageName = normalizeEnvValue(process.env.FACEBOOK_PAGE_NAME)
 
   if (configuredPageId) {
     if (configuredPageName) {
@@ -127,21 +138,32 @@ type PageWithInstagram = {
 export async function resolveInstagramFromPageToken(
   accessToken: string,
 ): Promise<{ page: { id: string; name: string }; igAccount: InstagramBusinessAccount }> {
-  const configuredPageId = process.env.FACEBOOK_PAGE_ID?.trim()
+  const configuredPageId = normalizeEnvValue(process.env.FACEBOOK_PAGE_ID)
+  const fields = "id,name,instagram_business_account{id,username}"
 
-  const page = configuredPageId
-    ? await graphRequest<PageWithInstagram>(`/${configuredPageId}`, {
-        accessToken,
-        params: {
-          fields: "id,name,instagram_business_account{id,username}",
-        },
-      })
-    : await graphRequest<PageWithInstagram>("/me", {
-        accessToken,
-        params: {
-          fields: "id,name,instagram_business_account{id,username}",
-        },
-      })
+  async function fetchPage(path: string): Promise<PageWithInstagram> {
+    return graphRequest<PageWithInstagram>(path, {
+      accessToken,
+      params: { fields },
+    })
+  }
+
+  let page: PageWithInstagram
+  try {
+    page = configuredPageId
+      ? await fetchPage(`/${configuredPageId}`)
+      : await fetchPage("/me")
+  } catch (error) {
+    if (configuredPageId) {
+      try {
+        page = await fetchPage("/me")
+      } catch (fallbackError) {
+        throw fallbackError
+      }
+    } else {
+      throw error
+    }
+  }
 
   if (!page.instagram_business_account?.id) {
     throw new IntegrationError({

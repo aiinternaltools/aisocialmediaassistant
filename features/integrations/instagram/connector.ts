@@ -13,6 +13,7 @@ import {
   graphRequest,
 } from "@/features/integrations/facebook/meta-graph-client"
 import { IntegrationError } from "@/features/integrations/shared/errors"
+import { AppError } from "@/lib/errors/app-error"
 import type {
   ConnectionContext,
   OAuthTokens,
@@ -292,8 +293,11 @@ export const instagramConnector: SocialPlatformConnector = {
         responsePayload: published as Record<string, unknown>,
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Instagram publish failed"
+      const message = AppError.isAppError(error)
+        ? error.userMessage
+        : error instanceof Error
+          ? error.message
+          : "Instagram publish failed"
       return {
         success: false,
         error: message,
@@ -302,6 +306,10 @@ export const instagramConnector: SocialPlatformConnector = {
           caption: input.text,
           imageUrl: input.imageUrl,
         },
+        responsePayload:
+          error instanceof IntegrationError && error.cause
+            ? (error.cause as Record<string, unknown>)
+            : undefined,
       }
     }
   },

@@ -1,6 +1,7 @@
 import "@/features/integrations/registry"
 import { getConnector } from "@/features/integrations/registry"
 import { resolveConnectionAccessToken } from "@/features/integrations/facebook/env-token"
+import { bucketForMediaType, createAdminSignedUrl } from "@/services/storage/upload"
 import type { ConnectionContext, PublishInput } from "@/features/integrations/types"
 import { createAdminClient } from "@/services/supabase/admin"
 import type { Json, Tables } from "@/types/database"
@@ -49,7 +50,7 @@ async function resolveImageUrl(postId: string): Promise<string | null> {
 
   const { data: media } = await supabase
     .from("post_media")
-    .select("storage_path")
+    .select("storage_path, media_type")
     .eq("post_id", postId)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -59,11 +60,23 @@ async function resolveImageUrl(postId: string): Promise<string | null> {
     return null
   }
 
-  const { data: signed } = await supabase.storage
-    .from("post-media")
-    .createSignedUrl(media.storage_path, 60 * 60)
+  const bucket = bucketForMediaType(media.media_type)
+  const signedUrl = await createAdminSignedUrl(
+    bucket,
+    media.storage_path,
+    60 * 60 * 24,
+  )
 
-  return signed?.signedUrl ?? null
+  if (!signedUrl) {
+    console.error("[publish] Failed to sign image URL", {
+      postId,
+      bucket,
+      storagePath: media.storage_path,
+      mediaType: media.media_type,
+    })
+  }
+
+  return signedUrl
 }
 
 async function getPlatformConnection(
