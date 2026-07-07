@@ -37,20 +37,42 @@ export function isMetaDevStubMode(): boolean {
   return true
 }
 
+function normalizeHost(value: string | undefined): string {
+  return value?.trim().replace(/^https?:\/\//, "").replace(/\/$/, "") ?? ""
+}
+
+function isLocalAppUrl(url: string): boolean {
+  return (
+    !url ||
+    url.includes("localhost") ||
+    url.includes("127.0.0.1")
+  )
+}
+
+/**
+ * Stable public origin for OAuth callbacks and absolute links.
+ * On Vercel production, prefers VERCEL_PROJECT_PRODUCTION_URL over VERCEL_URL
+ * so redirect URIs match registered OAuth URLs (VERCEL_URL is deployment-specific).
+ */
 export function getAppBaseUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? ""
-  const vercelHost = process.env.VERCEL_URL?.trim().replace(/^https?:\/\//, "")
 
-  if (vercelHost) {
-    const vercelBase = `https://${vercelHost}`
-    if (
-      !explicit ||
-      explicit.includes("localhost") ||
-      explicit.includes("127.0.0.1")
-    ) {
-      return vercelBase
-    }
+  if (explicit && !isLocalAppUrl(explicit)) {
     return explicit
+  }
+
+  if (process.env.VERCEL_ENV === "production") {
+    const productionHost = normalizeHost(
+      process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    )
+    if (productionHost) {
+      return `https://${productionHost}`
+    }
+  }
+
+  const vercelHost = normalizeHost(process.env.VERCEL_URL)
+  if (vercelHost) {
+    return `https://${vercelHost}`
   }
 
   return explicit || "http://localhost:3000"
@@ -59,15 +81,22 @@ export function getAppBaseUrl(): string {
 /** True when NEXT_PUBLIC_APP_URL points at localhost but the app runs on Vercel. */
 export function isAppUrlMisconfiguredForVercel(): boolean {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? ""
-  const vercelHost = process.env.VERCEL_URL?.trim()
-  if (!vercelHost) {
+  if (!process.env.VERCEL) {
     return false
   }
-  return (
-    !explicit ||
-    explicit.includes("localhost") ||
-    explicit.includes("127.0.0.1")
-  )
+
+  if (!isLocalAppUrl(explicit)) {
+    return false
+  }
+
+  if (
+    process.env.VERCEL_ENV === "production" &&
+    normalizeHost(process.env.VERCEL_PROJECT_PRODUCTION_URL)
+  ) {
+    return false
+  }
+
+  return Boolean(normalizeHost(process.env.VERCEL_URL))
 }
 
 export function getOAuthRedirectUri(platform: string): string {
