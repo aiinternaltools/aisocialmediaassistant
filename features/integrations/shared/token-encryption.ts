@@ -62,10 +62,23 @@ export function decryptToken(ciphertext: string): string {
   const decipher = createDecipheriv(ALGORITHM, key, iv)
   decipher.setAuthTag(authTag)
 
-  const decrypted = Buffer.concat([
-    decipher.update(encrypted),
-    decipher.final(),
-  ])
+  try {
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ])
 
-  return decrypted.toString("utf8")
+    return decrypted.toString("utf8")
+  } catch (error) {
+    throw new IntegrationError({
+      code: "INTERNAL",
+      message:
+        error instanceof Error
+          ? `Failed to decrypt stored token: ${error.message}`
+          : "Failed to decrypt stored token",
+      userMessage:
+        "Stored connection token could not be read. Reconnect the platform in Settings (encryption key may have changed).",
+      cause: error,
+    })
+  }
 }

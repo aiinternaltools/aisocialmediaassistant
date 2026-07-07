@@ -1,5 +1,6 @@
 import { graphRequest } from "@/features/integrations/facebook/meta-graph-client"
 import { IntegrationError } from "@/features/integrations/shared/errors"
+import { decryptToken } from "@/features/integrations/shared/token-encryption"
 import type { OAuthTokens } from "@/features/integrations/types"
 
 const FACEBOOK_SCOPES = [
@@ -24,6 +25,36 @@ export function getEnvFacebookPageAccessToken(): string {
     })
   }
   return token
+}
+
+type EnvPageTokenConnection = {
+  access_token_encrypted: string | null
+  metadata?: unknown
+}
+
+/** Prefer live env page token when the connection was created via env token flow. */
+export function resolveConnectionAccessToken(
+  connection: EnvPageTokenConnection,
+): string {
+  const metadata =
+    connection.metadata &&
+    typeof connection.metadata === "object" &&
+    !Array.isArray(connection.metadata)
+      ? (connection.metadata as Record<string, unknown>)
+      : {}
+  if (metadata.source === "env_page_token" && hasEnvFacebookPageToken()) {
+    return getEnvFacebookPageAccessToken()
+  }
+
+  if (!connection.access_token_encrypted) {
+    throw new IntegrationError({
+      code: "VALIDATION",
+      message: "Connection has no stored access token",
+      userMessage: "No active connection token. Reconnect this platform in Settings.",
+    })
+  }
+
+  return decryptToken(connection.access_token_encrypted)
 }
 
 async function resolvePageFromToken(

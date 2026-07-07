@@ -1,6 +1,6 @@
 import "@/features/integrations/registry"
 import { getConnector } from "@/features/integrations/registry"
-import { decryptToken } from "@/features/integrations/shared/token-encryption"
+import { resolveConnectionAccessToken } from "@/features/integrations/facebook/env-token"
 import type { ConnectionContext, PublishInput } from "@/features/integrations/types"
 import { createAdminClient } from "@/services/supabase/admin"
 import type { Json, Tables } from "@/types/database"
@@ -196,7 +196,40 @@ async function publishToPlatform(
     return { success: false, error }
   }
 
-  const accessToken = decryptToken(connection.access_token_encrypted)
+  let accessToken: string
+  try {
+    accessToken = resolveConnectionAccessToken(connection)
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to read connection token"
+    await writePublicationLog({
+      postId: post.id,
+      platformId,
+      platformConnectionId: connection.id,
+      status: "failed",
+      errorMessage,
+    })
+
+    if (jobId) {
+      const { data: job } = await supabase
+        .from("scheduled_jobs")
+        .select("attempts, max_attempts")
+        .eq("id", jobId)
+        .single()
+
+      const attempts = (job?.attempts ?? 0) + 1
+      const maxAttempts = job?.max_attempts ?? MAX_ATTEMPTS
+
+      await updateJobStatus(jobId, {
+        attempts,
+        last_error: errorMessage,
+        status: attempts >= maxAttempts ? "failed" : "pending",
+      })
+    }
+
+    return { success: false, error: errorMessage }
+  }
+
   const connector = getConnector(platformId)
   const imageUrl = post.media_type === "image" ? await resolveImageUrl(post.id) : null
 
