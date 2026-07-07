@@ -107,7 +107,51 @@ export async function graphRequest<T = Record<string, unknown>>(
     cache: "no-store",
   })
 
-  const payload = (await response.json()) as GraphResponse<T>
+  let payload = (await response.json()) as GraphResponse<T>
+
+  const isInvalidProof =
+    payload.error?.message?.includes("Invalid appsecret_proof") ?? false
+
+  if (isInvalidProof && options.accessToken && filteredParams.appsecret_proof) {
+    const retryParams = { ...filteredParams }
+    delete retryParams.appsecret_proof
+    const retryUrl =
+      method === "GET" ? buildUrl(path, retryParams) : buildUrl(path)
+
+    const retryResponse = await fetch(retryUrl, {
+      method,
+      headers: body
+        ? {
+            "Content-Type":
+              options.body && !Object.keys(retryParams).length
+                ? "application/json"
+                : "application/x-www-form-urlencoded",
+          }
+        : undefined,
+      body:
+        method === "GET"
+          ? undefined
+          : Object.keys(retryParams).length > 0
+            ? toFormBody(retryParams)
+            : body,
+      cache: "no-store",
+    })
+
+    payload = (await retryResponse.json()) as GraphResponse<T>
+    if (!retryResponse.ok || payload.error) {
+      const metaMessage =
+        payload.error?.message ??
+        `Graph API request failed (${retryResponse.status})`
+      throw new IntegrationError({
+        code: "EXTERNAL_SERVICE",
+        message: metaMessage,
+        userMessage: `Meta API error: ${metaMessage}`,
+        cause: payload.error,
+      })
+    }
+
+    return payload as T
+  }
 
   if (!response.ok || payload.error) {
     const metaMessage =

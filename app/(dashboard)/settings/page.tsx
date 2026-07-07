@@ -19,6 +19,7 @@ import { AiSettingsForm } from "@/features/settings/components/ai-settings-form"
 import { AppSettingsForm } from "@/features/settings/components/app-settings-form"
 import { SocialConnections } from "@/features/settings/components/social-connections"
 import { hasEnvFacebookPageToken } from "@/features/integrations/facebook/env-token"
+import { getMetaEnvDiagnostics } from "@/features/integrations/actions"
 import { hasEnvOpenAiApiKey } from "@/services/ai/env"
 import {
   mapSettingsToAiForm,
@@ -69,6 +70,13 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   ].filter(Boolean)
 
   const openAiAvailable = hasEnvOpenAiApiKey()
+  const facebookEnvTokenAvailable = hasEnvFacebookPageToken()
+  const metaEnvDiagnosticsResult = facebookEnvTokenAvailable
+    ? await getMetaEnvDiagnostics()
+    : null
+  const metaEnvDiagnostics = metaEnvDiagnosticsResult?.success
+    ? metaEnvDiagnosticsResult.data
+    : null
 
   const aiDefaults = settings
     ? mapSettingsToAiForm(settings, { openAiAvailable })
@@ -173,7 +181,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <TabsContent value="social" className="mt-6">
           <SocialConnections
             platforms={platformConnections}
-            facebookEnvTokenAvailable={hasEnvFacebookPageToken()}
+            facebookEnvTokenAvailable={facebookEnvTokenAvailable}
+            metaEnvDiagnostics={metaEnvDiagnostics}
           />
         </TabsContent>
 

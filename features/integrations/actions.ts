@@ -10,6 +10,7 @@ import {
 } from "@/features/integrations/facebook/config"
 import {
   buildFacebookTokensFromEnv,
+  getEnvFacebookPageAccessToken,
   hasEnvFacebookPageToken,
 } from "@/features/integrations/facebook/env-token"
 import { buildInstagramTokensFromEnv } from "@/features/integrations/instagram/connector"
@@ -158,7 +159,7 @@ export async function connectInstagramWithEnvPageToken(): Promise<ActionResult> 
         code: "VALIDATION",
         message: "FACEBOOK_PAGE_ACCESS_TOKEN missing",
         userMessage:
-          "Add FACEBOOK_PAGE_ACCESS_TOKEN to your server environment (Vercel), then redeploy.",
+          "Add FACEBOOK_PAGE_ACCESS_TOKEN to Vercel (Production environment), then redeploy.",
       })
     }
 
@@ -169,6 +170,47 @@ export async function connectInstagramWithEnvPageToken(): Promise<ActionResult> 
 
     revalidatePath(SETTINGS_PATH)
     return { success: true, data: undefined }
+  } catch (error) {
+    return toActionError(error)
+  }
+}
+
+export type MetaEnvDiagnostics = {
+  pageTokenConfigured: boolean
+  pageTokenLength: number
+  metaAppConfigured: boolean
+  encryptionKeyConfigured: boolean
+}
+
+/** Safe server-side check for Vercel env configuration (no secrets exposed). */
+export async function getMetaEnvDiagnostics(): Promise<
+  ActionResult<MetaEnvDiagnostics>
+> {
+  try {
+    await requireAuth()
+
+    let pageTokenLength = 0
+    if (hasEnvFacebookPageToken()) {
+      pageTokenLength = getEnvFacebookPageAccessToken().length
+    }
+
+    let encryptionKeyConfigured = false
+    try {
+      encryptToken("probe")
+      encryptionKeyConfigured = true
+    } catch {
+      encryptionKeyConfigured = false
+    }
+
+    return {
+      success: true,
+      data: {
+        pageTokenConfigured: hasEnvFacebookPageToken(),
+        pageTokenLength,
+        metaAppConfigured: getMetaAppConfig() !== null,
+        encryptionKeyConfigured,
+      },
+    }
   } catch (error) {
     return toActionError(error)
   }

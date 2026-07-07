@@ -22,6 +22,7 @@ import {
   connectPlatform,
   disconnectPlatform,
   refreshConnection,
+  type MetaEnvDiagnostics,
 } from "@/features/integrations/actions"
 import {
   getPlatformBrandStyle,
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils"
 interface SocialConnectionsProps {
   platforms: PlatformWithConnection[]
   facebookEnvTokenAvailable?: boolean
+  metaEnvDiagnostics?: MetaEnvDiagnostics | null
 }
 
 function getConnectionLabel(
@@ -61,6 +63,7 @@ function isConnected(connection: PlatformWithConnection["connection"]): boolean 
 export function SocialConnections({
   platforms,
   facebookEnvTokenAvailable = false,
+  metaEnvDiagnostics = null,
 }: SocialConnectionsProps) {
   const router = useRouter()
   const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
@@ -146,6 +149,29 @@ export function SocialConnections({
       <p className="text-sm text-muted-foreground">
         Connect your social accounts to publish posts.
       </p>
+
+      {facebookEnvTokenAvailable && metaEnvDiagnostics ? (
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+          <p className="font-medium">Server env (Meta page token flow)</p>
+          <ul className="mt-2 space-y-1 text-muted-foreground">
+            <li>
+              {metaEnvDiagnostics.pageTokenConfigured
+                ? `✓ Page token (${metaEnvDiagnostics.pageTokenLength} chars)`
+                : "✗ FACEBOOK_PAGE_ACCESS_TOKEN missing"}
+            </li>
+            <li>
+              {metaEnvDiagnostics.metaAppConfigured
+                ? "✓ App ID + secret"
+                : "✗ FACEBOOK_APP_ID / FACEBOOK_APP_SECRET missing"}
+            </li>
+            <li>
+              {metaEnvDiagnostics.encryptionKeyConfigured
+                ? "✓ TOKEN_ENCRYPTION_KEY"
+                : "✗ TOKEN_ENCRYPTION_KEY missing"}
+            </li>
+          </ul>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         {platforms.map((platform) => {
